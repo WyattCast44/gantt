@@ -4,6 +4,7 @@ arch('migrations use user stamps', function () {
     $infrastructureMigrations = [
         '0001_01_01_000001_create_cache_table.php',
         '0001_01_01_000002_create_jobs_table.php',
+        '0001_01_01_000003_create_activity_log_table.php',
     ];
 
     $migrations = collect(glob(base_path('database/migrations/*.php')))
