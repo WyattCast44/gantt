@@ -1,0 +1,17 @@
+name: gantt
+icon: null
+processes:
+  Lint / Test:
+    command: vendor/bin/rector && vendor/bin/pint && vendor/bin/pest -p
+    working_dir: null
+    auto_start: false
+    auto_restart: false
+    restart_when_changed: []
+    env: {}
+  Vite:
+    command: npm run dev
+    working_dir: null
+    auto_start: true
+    auto_restart: true
+    restart_when_changed: []
+    env: {}
