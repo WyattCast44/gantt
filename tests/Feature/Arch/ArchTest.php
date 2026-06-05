@@ -42,3 +42,9 @@ arch('rules')
         'App\Http\Controllers',
         'App\Http\Requests',
     ]);
+
+arch('requests use form request')
+    ->expect('App\Http\Requests')
+    ->toExtend('Illuminate\Foundation\Http\FormRequest')
+    ->toHaveMethod('rules')
+    ->toHaveMethod('authorize');
