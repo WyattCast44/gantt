@@ -2,7 +2,7 @@
 
 Operational Test Timeline & Dependency Management Platform
 
-_Version 6 - Open Issues Resolved_
+_Version 7 - Phases 1–2 Implemented (Architecture, Auth & RBAC)_
 
 # Overview
 
@@ -71,19 +71,32 @@ The following are explicitly out of scope for Version 1:
 
 # User Roles
 
-Roles are scoped per project, stored on the project_user membership. A user may be an owner of one project and a viewer of another. There is no global/system admin tier in V1.
+Roles are scoped per project. The single **owner** is stored as `owner_id` on the `projects` table (one owner per project, enforced by the column). Invited members are stored on the `project_user` pivot with a role of **admin**, **editor**, or **viewer**; the owner is also mirrored into the pivot with the `owner` role so member and accessible-project queries stay single-table (`owner_id` remains the authoritative source of ownership). A user may be an owner of one project and a viewer of another. There is no global/system admin tier in V1 — `admin` is a per-project role.
 
-## Owner (Project Admin)
+## Owner
 
 The user who creates a project owns it. The owner can:
 
 - Create and manage the project
-- Invite and remove members and set their roles (editor/viewer)
+- Invite and remove members and set their roles (admin/editor/viewer)
 - Create templates
 - Configure work schedules and holidays
 - Modify all tasks and metadata
 - Configure project and field classification markings
 - Export reports
+- Delete/archive the project (owner only)
+
+## Admin
+
+A project administrator with full operational control short of deleting the project. Can:
+
+- Everything an editor can do
+- Invite and remove members and set their roles (admin/editor/viewer)
+- Configure project settings, calendars, and classification
+
+Cannot:
+
+- Delete the project (owner only)
 
 ## Editor
 
@@ -543,8 +556,8 @@ This section captures system architecture, data isolation, type safety, testing,
 Core relational nodes:
 
 - User - system operator; owns projects they create and joins others via the project_user pivot.
-- Project - the top-level isolation boundary and workspace; owned by a user; contains tasks, documents, and teams.
-- ProjectUser (pivot) - project_id, user_id, and a role column (owner / editor / viewer) for project-level RBAC.
+- Project - the top-level isolation boundary and workspace; owned by a user via an `owner_id` foreign key (single owner per project); contains tasks, documents, and teams. Also carries the row-level classification scaffold (see Implementation Status).
+- ProjectUser (pivot) - project_id, user_id, and a role column for project-level RBAC. Invited members hold `admin` / `editor` / `viewer`; the owner is mirrored here with `owner` while `projects.owner_id` stays authoritative.
 - Document - project artifacts, telemetry logs, evaluation criteria; belongs to a Project.
 - Comment - polymorphic node (commentable_id / commentable_type) attachable to either a Document or a Task.
 - Task - recursive, self-referencing via parent_id, nested up to five levels.
@@ -642,17 +655,17 @@ The following conventions are enforced project-wide (where practical, via the Pe
 
 Recommended build sequence - from the data core outward, maximizing UI stability before the dynamic Gantt visualization. This is engineering sequencing, not a change to product scope.
 
-### Phase 1 - Baseline Architecture & Automated Enforcement
+### Phase 1 - Baseline Architecture & Automated Enforcement — ✅ COMPLETED
 
-Scaffold the Laravel shell and configure Pest. Commit the architecture tests so the build rejects any code violating the request/naming/layer paradigms.
+Scaffold the Laravel shell and configure Pest. Commit the architecture tests so the build rejects any code violating the request/naming/layer paradigms. Delivered: architecture test suite, `pint.json`, and a `composer lint` gate (Pint + Rector + tests). See Implementation Status & Established Conventions.
 
-### Phase 2 - Core Auth & Project Access Controls (RBAC)
+### Phase 2 - Core Auth & Project Access Controls (RBAC) — ✅ COMPLETED
 
-Stand up authentication and the project_user membership model with owner/editor/viewer roles. Deliver middleware/policies that block requests for projects the user is not a member of.
+Stand up authentication and the project membership model with owner/admin/editor/viewer roles. Deliver middleware/policies that block requests for projects the user is not a member of. Delivered: headless Fortify auth, the Inertia + React + TypeScript + Tailwind v4 frontend toolchain, the `Project` model + `project_user` pivot, `ProjectPolicy`, `EnsureProjectMember` middleware, and unit/feature/browser tests. (The `Project` model and pivot — originally sketched for Phase 3 — landed here because RBAC depends on them.)
 
-### Phase 3 - Project Topologies & Workspace Switching
+### Phase 3 - Project Topologies & Workspace Switching — ⏳ NEXT
 
-Deploy Project models and the project_user pivot. Build the React project-switcher so users move between workspaces while the client retains local view state.
+The `Project` model and `project_user` pivot already exist (Phase 2). This phase adds project CRUD (create / edit / archive) and the membership-management UI, then builds the React project-switcher so users move between workspaces while the client retains local view state. Reuse the existing `User::projects()` (all-accessible) relation, design-system primitives, and Wayfinder helpers; route write actions through FormRequests + a Service and shape Inertia payloads with API Resources.
 
 ### Phase 4 - Document Ingestion Subsystem
 
@@ -673,6 +686,61 @@ Lock the component rules - button variants, typography scale, responsive layout 
 ### Future Phase - Notification Engine Deployment
 
 Add new listeners (e.g., SendTaskAssignmentNotification) that handle delivery criteria, per-user preferences, batching/throttling, and message queuing - built on top of the Phase 6 event foundation without altering it.
+
+# Implementation Status & Established Conventions (through Phase 2)
+
+This section records what has actually been built and the engineering conventions now locked in, so Phase 3 starts from a known foundation. Phases 1–2 of the Build Roadmap are complete and fully tested (72 tests passing at the close of Phase 2).
+
+## Backend Conventions
+
+### Enums (`app/Enums`, string-backed)
+
+- **`Role`** — `Owner`, `Admin`, `Editor`, `Viewer`. Capability predicates `canEdit()`, `canManageMembers()`, `canConfigureProject()` are the single source of role capability logic (consumed by the policy).
+- **`ProjectStatus`** — `Active`, `Completed`; `label()`, `isActive()`.
+- **`BaseClassification`** — `UNCLASSIFIED` / `CUI` / `CONFIDENTIAL` / `SECRET` / `TOP_SECRET`; `label()`, `level(): int`, and `dominates(self): bool` — the seam future baseline-vs-field enforcement will use to ensure a field marking never exceeds the project baseline.
+- **`ThemePreference`** — `Light` / `Dark` / `System`.
+
+### Models & Data
+
+- **Audit stamps** — the `HasUserStamps` trait plus `userStamps()` / `softDeletesWithUserStamps()` Blueprint macros (in `AppServiceProvider`) add `created_by` / `updated_by` / `deleted_by` (nullOnDelete) and timestamps/soft deletes. Every domain table uses these macros; raw `->timestamps()` is forbidden (arch-tested).
+- **Classification scaffold** — the `classification()` Blueprint macro adds `base_classification` (default UNCLASSIFIED), `special_access_required` (bool), `handling_caveats` (json; e.g. SCI `['SI','TK']`), and `programs` (json; SAR program/level list). The `HasClassification` trait merges the casts via `initializeHasClassification()`. Currently applied to `Project` as a **row/project-level baseline**; per-field markings remain the documented V1 target and will reuse `BaseClassification::dominates()`.
+- **Morph map** — `Relation::enforceMorphMap(['user' => User, 'project' => Project, …])` in `AppServiceProvider`; every polymorphic participant must be registered here (no FQCN in the DB).
+- **Project** — `owner_id` FK (single authoritative owner), `members()` belongsToMany over `project_user` (`role` pivot column), `owner()` belongsTo, plus `roleFor()` / `isOwner()` / `isMember()`. A `booted()` `created` hook mirrors the owner into the pivot (role `owner`) so `members()` and `User::projects()` are single-query.
+- **User** — `theme` column with a `$attributes` default (so freshly created instances are never null), `ownedProjects()` (hasMany) and `projects()` (belongsToMany = all accessible projects).
+- Model shape: `#[Fillable([...])]` attribute, a `casts()` method, `SoftDeletes`, and a factory with semantic states (`withOwner`, `withMember`). All enforced by `tests/Feature/Arch`.
+
+### Authentication (headless Fortify)
+
+- Enabled features: registration, resetPasswords, updateProfileInformation, updatePasswords. Disabled for V1: two-factor, passkeys, email verification (no mail delivery yet — their migrations were removed).
+- `FortifyServiceProvider` binds Inertia pages to Fortify's view routes (`Auth/Login`, `Auth/Register`, `Auth/ForgotPassword`, `Auth/ResetPassword`) and keeps the login throttle limiter. `fortify.home` → `/dashboard`.
+
+### Authorization
+
+- **`ProjectPolicy`** (auto-discovered) is the single authority for actions: `create` (any authenticated user), `view` (member), `update` (canEdit), `manageMembers` / `updateSettings` (canManageMembers / canConfigureProject), `delete` (owner only).
+- **Two layers**: the `EnsureProjectMember` middleware (alias `project.member`) is the coarse membership gate on project route groups; controllers additionally call `$this->authorize(...)` via the `AuthorizesRequests` trait for explicit per-action checks. Both delegate to `ProjectPolicy`.
+
+### HTTP / Routing
+
+- Inertia, not REST (C1). Controllers are plain classes (extend nothing, `Controller` suffix) and — per the arch tests — may use only `App\Http\Requests`, `App\Services`, `App\Models`, `Illuminate\Http`, `Inertia`, and the `AuthorizesRequests` trait; never the DB facade directly.
+- Routes are split: `routes/web.php` (public/guest) and `routes/dashboard.php` (loaded behind the `web` + `auth` group via the `then` callback in `bootstrap/app.php`). Route model binding + Wayfinder helpers throughout.
+
+## Frontend Conventions
+
+- **Stack** — Inertia v3 + React + TypeScript (strict) + Tailwind v4, built by Vite with the React, Wayfinder, and Tailwind plugins. Entry: `resources/js/app.tsx`; pages resolved from `resources/js/Pages/**` with **PascalCase** filenames (e.g. `Auth/Login.tsx`, `Projects/Show.tsx`).
+- **Path alias** — `@/*` → `resources/js/*`.
+- **Type-safe routing** — Wayfinder generates typed route/action helpers into `@/routes` and `@/actions` (regenerate via build or `php artisan wayfinder:generate --with-form`); never hardcode URLs. Shared Inertia props are typed in `@/types` (`SharedProps`: `auth.user`, `flash`, sidebar state) and provided by `HandleInertiaRequests`.
+- **Design system (A9)** — primitives in `components/ui/*` (`Button` primary/secondary, `Input` md/lg, `Label`, `Card`, `InputError`) and `layouts/*` (`auth-layout`, `app-layout`). Helpers: `utils/cn.ts` (class join) and `utils/focusRing.ts` (shared focus-visible rings). Tailwind v4 is CSS-first in `resources/css/app.css` (`@theme`): an **accent** palette (aliased to blue so it can be re-skinned in one place), `border` / `border-dark` tokens, class-based dark mode via `@custom-variant dark`, and custom scrollbars. Use the `accent-*` / `border` tokens rather than raw colors.
+
+## Testing & Quality Gates
+
+- **Pest** suites: `Unit`, `Feature`, `Browser` (registered in `tests/Pest.php` + `phpunit.xml`); `LazilyRefreshDatabase`.
+- **Architecture tests** (`tests/Feature/Arch`) enforce: controller layer/suffix/no-raw-DB, FormRequest location + `Request` suffix + base class + `rules()`/`authorize()`, model invariants (Model base, `casts()`, SoftDeletes, HasUserStamps, factory, morph alias, datetime casts), and migration invariants (macros present, no `->timestamps()`).
+- **Browser tests** (Pest v4 + Playwright) cover the auth flows and a guest-page smoke pass (`assertNoSmoke`). Screenshots are git-ignored.
+- **Commands** — `composer lint` (Pint + Rector + tests), `php artisan test --compact`, `vendor/bin/pint --dirty`.
+
+## Phase 3 Starting Point
+
+`Project`, the `project_user` pivot, `ProjectPolicy`, `EnsureProjectMember`, and `ProjectController@show` already exist. Phase 3 should add project create / edit / archive (FormRequests + a Service + an API Resource for the Inertia payload), the members-management UI, and the React workspace switcher backed by `User::projects()` — reusing the design-system primitives and Wayfinder helpers above.
 
 # Architecture Issues - Resolved
 
