@@ -48,3 +48,11 @@ arch('requests use form request')
     ->toExtend('Illuminate\Foundation\Http\FormRequest')
     ->toHaveMethod('rules')
     ->toHaveMethod('authorize');
+
+arch('requests carry the Request suffix')
+    ->expect('App\Http\Requests')
+    ->toHaveSuffix('Request');
+
+arch('form requests are used only by controllers')
+    ->expect('App\Http\Requests')
+    ->toOnlyBeUsedIn('App\Http\Controllers');
