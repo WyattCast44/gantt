@@ -8,6 +8,7 @@ arch('controllers only use approved layers')
         'App\Services',
         'App\Models',
         'Illuminate\Http',
+        'Illuminate\Foundation\Auth\Access\AuthorizesRequests',
         'Inertia',
     ])
     ->ignoring('App\Http\Controllers\Concerns');

@@ -18,4 +18,4 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(LazilyRefreshDatabase::class)
-    ->in('Feature');
+    ->in('Feature', 'Browser');
