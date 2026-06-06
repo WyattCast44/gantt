@@ -21,15 +21,16 @@ export default function ForgotPassword({ status }: { status?: string }) {
             title="Forgot Password"
             description="Enter your email and we'll send a password reset link."
         >
-            {status && <p className="mb-4 text-sm font-medium text-green-600 dark:text-green-400">{status}</p>}
+            {status && <p className="mb-3 text-sm font-medium text-green-600 dark:text-green-400">{status}</p>}
 
-            <form onSubmit={submit} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
+            <form onSubmit={submit} className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
                     <Label htmlFor="email">Email</Label>
                     <Input
                         id="email"
                         name="email"
                         type="email"
+                        size="lg"
                         value={form.data.email}
                         onChange={(event) => form.setData('email', event.target.value)}
                         required
@@ -44,8 +45,8 @@ export default function ForgotPassword({ status }: { status?: string }) {
                 </Button>
             </form>
 
-            <div className="mt-4 text-sm">
-                <Link href={login.url()} className="text-blue-600 hover:underline dark:text-blue-400">
+            <div className="mt-3 text-xs">
+                <Link href={login.url()} className="text-accent-600 hover:underline dark:text-accent-400">
                     Back to sign in
                 </Link>
             </div>

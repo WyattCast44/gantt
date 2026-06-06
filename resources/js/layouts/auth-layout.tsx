@@ -9,17 +9,17 @@ type AuthLayoutProps = PropsWithChildren<{
 
 export default function AuthLayout({ title, description, children }: AuthLayoutProps) {
     return (
-        <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-gray-50 px-4 dark:bg-neutral-950">
+        <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-50 px-4 dark:bg-neutral-950">
             <Head title={title} />
 
-            <div className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">Gantt</div>
+            <div className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Gantt</div>
 
-            <div className="w-full max-w-sm">
+            <div className="w-full max-w-md">
                 <Card>
-                    <div className="mb-6">
-                        <h1 className="text-base font-semibold text-gray-900 dark:text-white">{title}</h1>
+                    <div className="mb-4">
+                        <h1 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h1>
                         {description && (
-                            <p className="mt-1 text-sm text-gray-500 dark:text-neutral-400">{description}</p>
+                            <p className="mt-0.5 text-xs text-gray-500 dark:text-neutral-400">{description}</p>
                         )}
                     </div>
 

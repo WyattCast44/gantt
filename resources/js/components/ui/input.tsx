@@ -1,13 +1,28 @@
+import { cn } from '@/utils/cn';
+import { focusRingInputLg, focusRingInputMd } from '@/utils/focusRing';
 import { forwardRef, type InputHTMLAttributes } from 'react';
 
-const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input(
-    { className = '', ...props },
+interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
+    size?: 'md' | 'lg';
+}
+
+const sizeClasses = {
+    md: cn('rounded-md py-1.5 shadow-sm', focusRingInputMd),
+    lg: cn('rounded-lg py-2 shadow-sm', focusRingInputLg),
+};
+
+const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
+    { size = 'md', className, ...props },
     ref,
 ) {
     return (
         <input
             ref={ref}
-            className={`block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:placeholder:text-neutral-500 ${className}`}
+            className={cn(
+                'block w-full border border-border bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 dark:border-border-dark dark:bg-neutral-800 dark:text-white dark:placeholder:text-neutral-500 dark:focus:border-accent-400',
+                sizeClasses[size],
+                className,
+            )}
             {...props}
         />
     );

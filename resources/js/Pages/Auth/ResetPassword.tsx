@@ -29,13 +29,14 @@ export default function ResetPassword({ token, email }: ResetPasswordProps) {
 
     return (
         <AuthLayout title="Reset Password" description="Choose a new password for your account.">
-            <form onSubmit={submit} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
+            <form onSubmit={submit} className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
                     <Label htmlFor="email">Email</Label>
                     <Input
                         id="email"
                         name="email"
                         type="email"
+                        size="lg"
                         value={form.data.email}
                         onChange={(event) => form.setData('email', event.target.value)}
                         required
@@ -44,12 +45,13 @@ export default function ResetPassword({ token, email }: ResetPasswordProps) {
                     <InputError message={form.errors.email} />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1">
                     <Label htmlFor="password">New Password</Label>
                     <Input
                         id="password"
                         name="password"
                         type="password"
+                        size="lg"
                         value={form.data.password}
                         onChange={(event) => form.setData('password', event.target.value)}
                         required
@@ -59,12 +61,13 @@ export default function ResetPassword({ token, email }: ResetPasswordProps) {
                     <InputError message={form.errors.password} />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1">
                     <Label htmlFor="password_confirmation">Confirm Password</Label>
                     <Input
                         id="password_confirmation"
                         name="password_confirmation"
                         type="password"
+                        size="lg"
                         value={form.data.password_confirmation}
                         onChange={(event) => form.setData('password_confirmation', event.target.value)}
                         required

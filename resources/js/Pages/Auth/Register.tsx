@@ -25,12 +25,13 @@ export default function Register() {
 
     return (
         <AuthLayout title="Create Account" description="Set up a new account to start planning.">
-            <form onSubmit={submit} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
+            <form onSubmit={submit} className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
                     <Label htmlFor="name">Name</Label>
                     <Input
                         id="name"
                         name="name"
+                        size="lg"
                         value={form.data.name}
                         onChange={(event) => form.setData('name', event.target.value)}
                         required
@@ -40,12 +41,13 @@ export default function Register() {
                     <InputError message={form.errors.name} />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1">
                     <Label htmlFor="email">Email</Label>
                     <Input
                         id="email"
                         name="email"
                         type="email"
+                        size="lg"
                         value={form.data.email}
                         onChange={(event) => form.setData('email', event.target.value)}
                         required
@@ -54,12 +56,13 @@ export default function Register() {
                     <InputError message={form.errors.email} />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1">
                     <Label htmlFor="password">Password</Label>
                     <Input
                         id="password"
                         name="password"
                         type="password"
+                        size="lg"
                         value={form.data.password}
                         onChange={(event) => form.setData('password', event.target.value)}
                         required
@@ -68,12 +71,13 @@ export default function Register() {
                     <InputError message={form.errors.password} />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1">
                     <Label htmlFor="password_confirmation">Confirm Password</Label>
                     <Input
                         id="password_confirmation"
                         name="password_confirmation"
                         type="password"
+                        size="lg"
                         value={form.data.password_confirmation}
                         onChange={(event) => form.setData('password_confirmation', event.target.value)}
                         required
@@ -87,9 +91,9 @@ export default function Register() {
                 </Button>
             </form>
 
-            <div className="mt-4 text-sm text-gray-600 dark:text-neutral-400">
+            <div className="mt-3 text-xs text-gray-600 dark:text-neutral-400">
                 Already have an account?{' '}
-                <Link href={login.url()} className="text-blue-600 hover:underline dark:text-blue-400">
+                <Link href={login.url()} className="text-accent-600 hover:underline dark:text-accent-400">
                     Sign in
                 </Link>
             </div>

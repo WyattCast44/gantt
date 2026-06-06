@@ -24,7 +24,7 @@ class DatabaseSeeder extends Seeder
             'email' => 'test@example.com',
         ]);
 
-        $projects = Project::factory()
+        Project::factory()
             ->count(5)
             ->withOwner($user)
             ->withMember($user, Role::Owner)

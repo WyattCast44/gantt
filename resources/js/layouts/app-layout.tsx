@@ -14,7 +14,7 @@ export default function AppLayout({ title, children }: AppLayoutProps) {
         <div className="min-h-screen bg-gray-50 text-gray-900 dark:bg-neutral-950 dark:text-neutral-100">
             <Head title={title} />
 
-            <header className="border-b border-gray-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+            <header className="border-b border-border bg-white dark:border-border-dark dark:bg-neutral-900">
                 <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
                     <span className="text-sm font-semibold tracking-tight">Gantt</span>
 
