@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Enums\BaseClassification;
+use App\Enums\ProjectStatus;
 use App\Enums\Role;
 use App\Models\Project;
 use App\Models\User;
@@ -30,12 +31,20 @@ class ProjectFactory extends Factory
             'description' => fake()->sentence(),
             'start_date' => $start,
             'end_date' => fake()->dateTimeBetween($start, '+6 months'),
-            'status' => 'active',
+            'status' => ProjectStatus::Active,
             'base_classification' => BaseClassification::UNCLASSIFIED,
             'special_access_required' => false,
             'handling_caveats' => null,
             'programs' => null,
         ];
+    }
+
+    /**
+     * Mark the project as completed.
+     */
+    public function completed(): static
+    {
+        return $this->state(['status' => ProjectStatus::Completed]);
     }
 
     /**

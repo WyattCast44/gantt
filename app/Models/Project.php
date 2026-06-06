@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\ProjectStatus;
 use App\Enums\Role;
 use App\Models\Concerns\HasClassification;
 use App\Models\Concerns\HasUserStamps;
@@ -29,6 +30,7 @@ class Project extends Model
     protected function casts(): array
     {
         return [
+            'status' => ProjectStatus::class,
             'start_date' => 'date',
             'end_date' => 'date',
             'created_at' => 'datetime',
