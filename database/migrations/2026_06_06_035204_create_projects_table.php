@@ -21,7 +21,7 @@ return new class extends Migration
             $table->date('start_date')->nullable();
             $table->date('end_date')->nullable();
             $table->string('status')->default('active');
-            $table->string('classification')->default('UNCLASSIFIED');
+            $table->classification();
             $table->userStamps();
             $table->softDeletesWithUserStamps();
         });

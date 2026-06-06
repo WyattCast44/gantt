@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\BaseClassification;
 use App\Enums\Role;
 use App\Models\Project;
 use App\Models\User;
@@ -30,8 +31,32 @@ class ProjectFactory extends Factory
             'start_date' => $start,
             'end_date' => fake()->dateTimeBetween($start, '+6 months'),
             'status' => 'active',
-            'classification' => 'UNCLASSIFIED',
+            'base_classification' => BaseClassification::UNCLASSIFIED,
+            'special_access_required' => false,
+            'handling_caveats' => null,
+            'programs' => null,
         ];
+    }
+
+    /**
+     * Set the project's baseline classification.
+     */
+    public function classifiedAs(BaseClassification $level): static
+    {
+        return $this->state(['base_classification' => $level]);
+    }
+
+    /**
+     * Flag the project as requiring special access, optionally with programs.
+     *
+     * @param  array<int, array{name: string, level: string}>  $programs
+     */
+    public function withSpecialAccess(array $programs = []): static
+    {
+        return $this->state([
+            'special_access_required' => true,
+            'programs' => $programs === [] ? null : $programs,
+        ]);
     }
 
     /**
