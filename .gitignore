@@ -26,3 +26,8 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 tests/Browser/Screenshots
+
+# wayfinder generated files
+resources/js/actions/
+resources/js/routes/
+resources/js/wayfinder/
