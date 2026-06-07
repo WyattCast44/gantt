@@ -6,16 +6,18 @@ namespace App\Policies;
 
 use App\Models\Comment;
 use App\Models\Document;
+use App\Models\Task;
 use App\Models\User;
 
 class CommentPolicy
 {
     /**
-     * Owners, admins, and editors may comment on a document.
+     * Owners, admins, and editors may comment on any commentable (document or
+     * task), gated by their role on the commentable's project.
      */
-    public function create(User $user, Document $document): bool
+    public function create(User $user, Document|Task $commentable): bool
     {
-        return $document->project->roleFor($user)?->canEdit() ?? false;
+        return $commentable->project->roleFor($user)?->canEdit() ?? false;
     }
 
     /**

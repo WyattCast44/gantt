@@ -4,7 +4,9 @@ import Button, { buttonClasses } from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 import PageHeader from '@/components/ui/page-header';
+import { Tooltip } from '@/components/ui/tooltip';
 import EditDocumentModal from '@/Pages/Documents/Partials/EditDocumentModal';
+import { classificationTooltip, type DocumentTypeValue, typeTooltip } from '@/Pages/Documents/Partials/badges';
 import UploadDocumentModal from '@/Pages/Documents/Partials/UploadDocumentModal';
 import AppLayout from '@/layouts/app-layout';
 import { destroy as documentDestroy, show as documentShow } from '@/routes/projects/documents';
@@ -82,10 +84,14 @@ export default function Index({ project, documents }: { project: Project; docume
                                             <div className="text-xs text-slate-400 dark:text-neutral-500">{document.original_filename}</div>
                                         </td>
                                         <td className="px-4 py-3">
-                                            <Badge>{document.type.label}</Badge>
+                                            <Tooltip label={typeTooltip(document.type.value as DocumentTypeValue)}>
+                                                <Badge>{document.type.label}</Badge>
+                                            </Tooltip>
                                         </td>
                                         <td className="px-4 py-3">
-                                            <Badge tone="accent">{document.base_classification.label}</Badge>
+                                            <Tooltip label={classificationTooltip(document.base_classification.value)}>
+                                                <Badge tone="accent">{document.base_classification.label}</Badge>
+                                            </Tooltip>
                                         </td>
                                         <td className="px-4 py-3 text-slate-500 dark:text-neutral-400">{document.size_label}</td>
                                         <td className="px-4 py-3">
@@ -113,17 +119,37 @@ export default function Index({ project, documents }: { project: Project; docume
                                         <td className="px-4 py-3">
                                             {/* Actions live inside the clickable row, so stop the click from also navigating. */}
                                             <div className="flex items-center justify-end gap-1" onClick={(event) => event.stopPropagation()}>
-                                                <a href={document.download_url} className={buttonClasses('ghost', 'icon')} aria-label="Download">
-                                                    <Download className="h-4 w-4" aria-hidden />
-                                                </a>
+                                                <Tooltip label="Download document">
+                                                    <a
+                                                        href={document.download_url}
+                                                        className={buttonClasses('ghost', 'icon')}
+                                                        aria-label="Download document"
+                                                    >
+                                                        <Download className="h-4 w-4" aria-hidden />
+                                                    </a>
+                                                </Tooltip>
                                                 {project.can.update && (
                                                     <>
-                                                        <Button variant="ghost" size="icon" aria-label="Edit" onClick={() => setEditing(document)}>
-                                                            <Pencil className="h-4 w-4" aria-hidden />
-                                                        </Button>
-                                                        <Button variant="ghost" size="icon" aria-label="Delete" onClick={() => setDeleting(document)}>
-                                                            <Trash2 className="h-4 w-4" aria-hidden />
-                                                        </Button>
+                                                        <Tooltip label="Edit document">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                aria-label="Edit document"
+                                                                onClick={() => setEditing(document)}
+                                                            >
+                                                                <Pencil className="h-4 w-4" aria-hidden />
+                                                            </Button>
+                                                        </Tooltip>
+                                                        <Tooltip label="Delete document">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                aria-label="Delete document"
+                                                                onClick={() => setDeleting(document)}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" aria-hidden />
+                                                            </Button>
+                                                        </Tooltip>
                                                     </>
                                                 )}
                                             </div>

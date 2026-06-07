@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\AcceptInvitationController;
 use App\Http\Controllers\CommentController;
+use App\Http\Controllers\CompleteTaskController;
 use App\Http\Controllers\DeclineInvitationController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\DownloadDocumentController;
@@ -16,6 +17,11 @@ use App\Http\Controllers\ProjectSettingsController;
 use App\Http\Controllers\RestoreProjectController;
 use App\Http\Controllers\SidebarCollapsedController;
 use App\Http\Controllers\SidebarWidthController;
+use App\Http\Controllers\TaskCommentController;
+use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TaskDependencyController;
+use App\Http\Controllers\TaskDocumentController;
+use App\Http\Controllers\UploadTaskDocumentController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -129,6 +135,74 @@ Route::delete('/projects/{project}/documents/{document}/comments/{comment}', [Co
     ->middleware('project.member')
     ->scopeBindings()
     ->name('projects.documents.comments.destroy');
+
+Route::get('/projects/{project}/tasks', [TaskController::class, 'index'])
+    ->middleware('project.member')
+    ->name('projects.tasks.index');
+
+Route::post('/projects/{project}/tasks', [TaskController::class, 'store'])
+    ->middleware('project.member')
+    ->name('projects.tasks.store');
+
+Route::get('/projects/{project}/tasks/{task}', [TaskController::class, 'show'])
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.tasks.show');
+
+Route::patch('/projects/{project}/tasks/{task}', [TaskController::class, 'update'])
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.tasks.update');
+
+Route::post('/projects/{project}/tasks/{task}/complete', CompleteTaskController::class)
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.tasks.complete');
+
+Route::delete('/projects/{project}/tasks/{task}', [TaskController::class, 'destroy'])
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.tasks.destroy');
+
+Route::post('/projects/{project}/tasks/{task}/comments', [TaskCommentController::class, 'store'])
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.tasks.comments.store');
+
+Route::patch('/projects/{project}/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'update'])
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.tasks.comments.update');
+
+Route::delete('/projects/{project}/tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroy'])
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.tasks.comments.destroy');
+
+Route::post('/projects/{project}/tasks/{task}/dependencies', [TaskDependencyController::class, 'store'])
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.tasks.dependencies.store');
+
+Route::delete('/projects/{project}/tasks/{task}/dependencies/{predecessor}', [TaskDependencyController::class, 'destroy'])
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.tasks.dependencies.destroy');
+
+Route::post('/projects/{project}/tasks/{task}/documents', [TaskDocumentController::class, 'store'])
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.tasks.documents.store');
+
+Route::post('/projects/{project}/tasks/{task}/documents/upload', UploadTaskDocumentController::class)
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.tasks.documents.upload');
+
+Route::delete('/projects/{project}/tasks/{task}/documents/{document}', [TaskDocumentController::class, 'destroy'])
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.tasks.documents.destroy');
 
 /*
 |-----------------------------------------------------------------------------

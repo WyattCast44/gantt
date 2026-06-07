@@ -8,6 +8,9 @@ arch('controllers only use approved layers')
         'App\Http\Resources',
         'App\Mail',
         'App\Models',
+        // Generic domain-event bus (A10): controllers dispatch thin events;
+        // listeners (notification delivery, telemetry) subscribe out of band.
+        'App\Events',
         // Domain value objects (e.g. action verbs passed to Model::logAction()).
         'App\Enums',
         'Illuminate\Http',

@@ -126,6 +126,65 @@ export interface Document {
     activities: Activity[];
 }
 
+export type TaskStatusValue = 'not_started' | 'in_progress' | 'blocked' | 'complete';
+
+export type RiskLevelValue = 'low' | 'medium' | 'high';
+
+export const TASK_STATUSES: { value: TaskStatusValue; label: string }[] = [
+    { value: 'not_started', label: 'Not started' },
+    { value: 'in_progress', label: 'In progress' },
+    { value: 'blocked', label: 'Blocked' },
+    { value: 'complete', label: 'Complete' },
+];
+
+export const RISK_LEVELS: { value: RiskLevelValue; label: string }[] = [
+    { value: 'low', label: 'Low' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'high', label: 'High' },
+];
+
+/** A predecessor/successor reference in a task's dependency list (DependencyResource). */
+export interface Dependency {
+    id: number;
+    name: string;
+}
+
+/** A project task (TaskResource). Recursive via `children`. */
+export interface Task {
+    id: number;
+    name: string;
+    description: string | null;
+    parent_id: number | null;
+    hierarchy_level: number;
+    sort_order: number;
+    start_date: string | null;
+    duration_days: number;
+    /** Derived (start + duration, day-grain); null when unscheduled. */
+    end_date: string | null;
+    is_date_locked: boolean;
+    status: Labeled<TaskStatusValue>;
+    risk_level: Labeled<RiskLevelValue>;
+    base_classification: Labeled<BaseClassificationValue>;
+    organization: string | null;
+    tags: string[];
+    percent_complete: number;
+    created_by?: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+    /** Direct children (present on the index tree and the detail subtree). */
+    children: Task[];
+    /** Predecessor tasks this task depends on (detail view only). */
+    predecessors?: Dependency[];
+    /** Successor tasks that depend on this one (detail view only). */
+    successors?: Dependency[];
+    /** Attached project documents (detail view only). */
+    documents?: Document[];
+    /** Comment thread (detail view only). */
+    comments?: Comment[];
+    /** Audit trail (detail view only). */
+    activities?: Activity[];
+}
+
 /**
  * A single append-only audit-log entry (ActivityResource). `attribute_changes`
  * holds the before/after values: `attributes` is the new state, `old` the

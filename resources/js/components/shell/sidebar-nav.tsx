@@ -7,6 +7,7 @@ import {
     show as projectShow,
 } from '@/routes/projects';
 import { index as documentsIndex } from '@/routes/projects/documents';
+import { index as tasksIndex } from '@/routes/projects/tasks';
 import { type Project, type SharedProps } from '@/types';
 import { cn } from '@/utils/cn';
 import { focusRingNeutral } from '@/utils/focusRing';
@@ -55,6 +56,7 @@ function globalItems(current: string): NavLink[] {
 
 function projectItems(project: Project, current: string): NavLink[] {
     const overviewUrl = projectShow.url(project.id);
+    const tasksUrl = tasksIndex.url(project.id);
     const documentsUrl = documentsIndex.url(project.id);
     const settingsUrl = projectSettings.url(project.id);
     const onSettings = current.startsWith(settingsUrl);
@@ -62,7 +64,7 @@ function projectItems(project: Project, current: string): NavLink[] {
     const items: NavLink[] = [
         { key: 'overview', label: 'Overview', icon: LayoutGrid, href: overviewUrl, active: current === overviewUrl },
         { key: 'timeline', label: 'Timeline', icon: GanttChartSquare, disabled: true },
-        { key: 'tasks', label: 'Tasks', icon: ListTree, disabled: true },
+        { key: 'tasks', label: 'Tasks', icon: ListTree, href: tasksUrl, active: current.startsWith(tasksUrl) },
         { key: 'calendar', label: 'Calendar', icon: Calendar, disabled: true },
         { key: 'documents', label: 'Documents', icon: FileText, href: documentsUrl, active: current.startsWith(documentsUrl) },
     ];

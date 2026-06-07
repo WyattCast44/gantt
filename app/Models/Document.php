@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\BaseClassification;
 use App\Enums\DocumentType;
 use App\Models\Concerns\HasClassification;
 use App\Models\Concerns\HasUserStamps;
@@ -14,8 +15,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -69,6 +72,50 @@ class Document extends Model
     public function comments(): MorphMany
     {
         return $this->morphMany(Comment::class, 'commentable');
+    }
+
+    /**
+     * Tasks this document is attached to.
+     *
+     * @return BelongsToMany<Task, $this>
+     */
+    public function tasks(): BelongsToMany
+    {
+        return $this->belongsToMany(Task::class, 'document_task')->withTimestamps();
+    }
+
+    /**
+     * Store an uploaded file as a project document. The blob write and the
+     * server-derived storage metadata live on the model (per C5), so both the
+     * Documents upload controller and the task upload-and-attach controller
+     * share one implementation rather than duplicating the file handling.
+     */
+    public static function storeUploadedFile(
+        Project $project,
+        UploadedFile $file,
+        ?string $name,
+        ?string $description,
+        BaseClassification $classification,
+    ): self {
+        $path = $file->store((string) $project->id, self::DISK);
+
+        $document = new self([
+            'name' => $name !== null && $name !== '' ? $name : $file->getClientOriginalName(),
+            'description' => $description,
+            'base_classification' => $classification,
+        ]);
+
+        // Storage metadata is derived server-side; it is not #[Fillable].
+        $document->disk = self::DISK;
+        $document->path = $path;
+        $document->original_filename = $file->getClientOriginalName();
+        $document->mime_type = $file->getMimeType();
+        $document->size_bytes = $file->getSize();
+        $document->checksum = hash_file('sha256', $file->getRealPath());
+
+        $project->documents()->save($document);
+
+        return $document;
     }
 
     /**

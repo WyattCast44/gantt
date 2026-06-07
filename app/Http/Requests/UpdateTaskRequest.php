@@ -5,23 +5,23 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use App\Enums\BaseClassification;
-use App\Models\Comment;
+use App\Enums\RiskLevel;
+use App\Enums\TaskStatus;
 use App\Models\Project;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class StoreCommentRequest extends FormRequest
+class UpdateTaskRequest extends FormRequest
 {
     /**
-     * Owners, admins, and editors may comment on the commentable (document or
-     * task), resolved from whichever route parameter is present.
+     * Owners, admins, and editors may edit tasks. Reparenting (and the subtree
+     * re-leveling it implies) is deferred to the Phase 7 Gantt, so parent_id is
+     * intentionally not editable here.
      */
     public function authorize(): bool
     {
-        $commentable = $this->route('document') ?? $this->route('task');
-
-        return $this->user()?->can('create', [Comment::class, $commentable]) ?? false;
+        return $this->user()?->can('update', $this->route('project')) ?? false;
     }
 
     /**
@@ -30,13 +30,23 @@ class StoreCommentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'body' => ['required', 'string', 'max:5000'],
+            'name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'start_date' => ['nullable', 'date'],
+            'duration_days' => ['required', 'integer', 'min:1', 'max:3650'],
+            'is_date_locked' => ['boolean'],
+            'status' => ['required', Rule::enum(TaskStatus::class)],
+            'percent_complete' => ['required', 'integer', 'between:0,100'],
+            'risk_level' => ['required', Rule::enum(RiskLevel::class)],
+            'organization' => ['nullable', 'string', 'max:255'],
+            'tags' => ['nullable', 'array'],
+            'tags.*' => ['string', 'max:50'],
             'base_classification' => ['required', Rule::enum(BaseClassification::class)],
         ];
     }
 
     /**
-     * Domain guard: a comment's marking may not exceed the project baseline.
+     * Domain guard: a task's marking may not exceed the project baseline.
      */
     public function after(): array
     {
@@ -54,7 +64,7 @@ class StoreCommentRequest extends FormRequest
                 if ($requested !== null && ! $project->baseClassification()->dominates($requested)) {
                     $validator->errors()->add(
                         'base_classification',
-                        'A comment cannot be classified above the project baseline.',
+                        'A task cannot be classified above the project baseline.',
                     );
                 }
             },
@@ -62,7 +72,7 @@ class StoreCommentRequest extends FormRequest
     }
 
     /**
-     * The comment's classification marking as an enum.
+     * The task's classification marking as an enum.
      */
     public function classification(): BaseClassification
     {

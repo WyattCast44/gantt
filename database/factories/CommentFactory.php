@@ -7,6 +7,7 @@ namespace Database\Factories;
 use App\Enums\BaseClassification;
 use App\Models\Comment;
 use App\Models\Document;
+use App\Models\Task;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -40,6 +41,17 @@ class CommentFactory extends Factory
         return $this->state([
             'commentable_type' => 'document',
             'commentable_id' => $document->id,
+        ]);
+    }
+
+    /**
+     * Attach the comment to a specific task.
+     */
+    public function forTask(Task $task): static
+    {
+        return $this->state([
+            'commentable_type' => 'task',
+            'commentable_id' => $task->id,
         ]);
     }
 

@@ -20,6 +20,10 @@ const EVENT_LABELS: Record<string, string> = {
     downloaded: 'Downloaded',
     previewed: 'Previewed',
     exported: 'Exported',
+    attached: 'Attached',
+    detached: 'Detached',
+    dependency_added: 'Dependency added',
+    dependency_removed: 'Dependency removed',
 };
 
 /** Render an arbitrary logged value compactly for the diff display. */

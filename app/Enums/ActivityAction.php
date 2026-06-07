@@ -15,4 +15,8 @@ enum ActivityAction: string
     case Downloaded = 'downloaded';
     case Previewed = 'previewed';
     case Exported = 'exported';
+    case Attached = 'attached';
+    case Detached = 'detached';
+    case DependencyAdded = 'dependency_added';
+    case DependencyRemoved = 'dependency_removed';
 }

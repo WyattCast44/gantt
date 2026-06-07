@@ -18,6 +18,10 @@ type UploadDocumentModalProps = {
     open: boolean;
     onClose: () => void;
     options: typeof CLASSIFICATIONS;
+    /** Override the submit endpoint (e.g. upload-and-attach on a task). */
+    action?: string;
+    /** Called after a successful upload, in addition to closing. */
+    onUploaded?: () => void;
 };
 
 type FileMetaEntry = {
@@ -67,7 +71,7 @@ function firstFileError(errors: Partial<Record<string, string>>): string | undef
     return key ? errors[key] : undefined;
 }
 
-export default function UploadDocumentModal({ project, open, onClose, options }: UploadDocumentModalProps) {
+export default function UploadDocumentModal({ project, open, onClose, options, action, onUploaded }: UploadDocumentModalProps) {
     const form = useForm<UploadFormData>({
         files: [],
         file_meta: [],
@@ -108,10 +112,11 @@ export default function UploadDocumentModal({ project, open, onClose, options }:
     const submit = (event: FormEvent) => {
         event.preventDefault();
 
-        form.post(documentStore.url(project.id), {
+        form.post(action ?? documentStore.url(project.id), {
             preserveScroll: true,
             onSuccess: () => {
                 form.reset();
+                onUploaded?.();
                 onClose();
             },
         });

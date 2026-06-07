@@ -2,6 +2,7 @@ import { queryParams, type RouteQueryOptions, type RouteDefinition, applyUrlDefa
 import members from './members'
 import invitations from './invitations'
 import documents from './documents'
+import tasks from './tasks'
 /**
 * @see \App\Http\Controllers\ProjectController::index
 * @see app/Http/Controllers/ProjectController.php:27
@@ -446,6 +447,7 @@ const projects = {
     members: Object.assign(members, members),
     invitations: Object.assign(invitations, invitations),
     documents: Object.assign(documents, documents),
+    tasks: Object.assign(tasks, tasks),
 }
 
 export default projects

@@ -14,7 +14,6 @@ use App\Models\Document;
 use App\Models\Project;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\UploadedFile;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -72,9 +71,16 @@ class DocumentController
     {
         $files = $request->uploadedFiles();
         $singleUpload = count($files) === 1;
+        $sharedName = $request->validated('name');
 
         foreach ($files as $index => $file) {
-            $this->persistUploadedFile($project, $file, $request, $singleUpload, $index);
+            Document::storeUploadedFile(
+                $project,
+                $file,
+                $singleUpload && is_string($sharedName) ? $sharedName : null,
+                $request->descriptionForIndex($index),
+                $request->classificationForIndex($index),
+            );
         }
 
         $count = count($files);
@@ -83,38 +89,6 @@ class DocumentController
             'status',
             $count === 1 ? 'Document uploaded.' : "{$count} documents uploaded.",
         );
-    }
-
-    /**
-     * Store a single uploaded file as a project document.
-     */
-    private function persistUploadedFile(
-        Project $project,
-        UploadedFile $file,
-        StoreDocumentRequest $request,
-        bool $useCustomName,
-        int $index,
-    ): void {
-        $path = $file->store((string) $project->id, Document::DISK);
-
-        $document = new Document([
-            'name' => $useCustomName && $request->validated('name')
-                ? $request->validated('name')
-                : $file->getClientOriginalName(),
-            'description' => $request->descriptionForIndex($index),
-            'base_classification' => $request->classificationForIndex($index),
-        ]);
-
-        // Storage metadata is derived server-side; it is not in the model's
-        // #[Fillable] set, so it is set explicitly rather than mass-assigned.
-        $document->disk = Document::DISK;
-        $document->path = $path;
-        $document->original_filename = $file->getClientOriginalName();
-        $document->mime_type = $file->getMimeType();
-        $document->size_bytes = $file->getSize();
-        $document->checksum = hash_file('sha256', $file->getRealPath());
-
-        $project->documents()->save($document);
     }
 
     /**

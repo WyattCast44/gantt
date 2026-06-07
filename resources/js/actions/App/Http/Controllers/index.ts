@@ -7,6 +7,12 @@ import DocumentController from './DocumentController'
 import DownloadDocumentController from './DownloadDocumentController'
 import PreviewDocumentController from './PreviewDocumentController'
 import CommentController from './CommentController'
+import TaskController from './TaskController'
+import CompleteTaskController from './CompleteTaskController'
+import TaskCommentController from './TaskCommentController'
+import TaskDependencyController from './TaskDependencyController'
+import TaskDocumentController from './TaskDocumentController'
+import UploadTaskDocumentController from './UploadTaskDocumentController'
 import InvitationController from './InvitationController'
 import AcceptInvitationController from './AcceptInvitationController'
 import DeclineInvitationController from './DeclineInvitationController'
@@ -23,6 +29,12 @@ const Controllers = {
     DownloadDocumentController: Object.assign(DownloadDocumentController, DownloadDocumentController),
     PreviewDocumentController: Object.assign(PreviewDocumentController, PreviewDocumentController),
     CommentController: Object.assign(CommentController, CommentController),
+    TaskController: Object.assign(TaskController, TaskController),
+    CompleteTaskController: Object.assign(CompleteTaskController, CompleteTaskController),
+    TaskCommentController: Object.assign(TaskCommentController, TaskCommentController),
+    TaskDependencyController: Object.assign(TaskDependencyController, TaskDependencyController),
+    TaskDocumentController: Object.assign(TaskDocumentController, TaskDocumentController),
+    UploadTaskDocumentController: Object.assign(UploadTaskDocumentController, UploadTaskDocumentController),
     InvitationController: Object.assign(InvitationController, InvitationController),
     AcceptInvitationController: Object.assign(AcceptInvitationController, AcceptInvitationController),
     DeclineInvitationController: Object.assign(DeclineInvitationController, DeclineInvitationController),

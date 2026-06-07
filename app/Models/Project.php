@@ -100,6 +100,16 @@ class Project extends Model
     }
 
     /**
+     * Tasks belonging to this project (all tiers, flat).
+     *
+     * @return HasMany<Task, $this>
+     */
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
+
+    /**
      * Determine whether the given user owns this project.
      */
     public function isOwner(User $user): bool

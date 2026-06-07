@@ -9,6 +9,7 @@ use App\Models\Comment;
 use App\Models\Document;
 use App\Models\Project;
 use App\Models\ProjectInvitation;
+use App\Models\Task;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
@@ -42,6 +43,7 @@ class AppServiceProvider extends ServiceProvider
             'project_invitation' => ProjectInvitation::class,
             'document' => Document::class,
             'comment' => Comment::class,
+            'task' => Task::class,
         ]);
 
         return $this;
