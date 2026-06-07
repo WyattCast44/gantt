@@ -123,6 +123,26 @@ export interface Document {
     download_url: string;
     preview_url: string;
     comments: Comment[];
+    activities: Activity[];
+}
+
+/**
+ * A single append-only audit-log entry (ActivityResource). `attribute_changes`
+ * holds the before/after values: `attributes` is the new state, `old` the
+ * previous one. Created entries omit `old`; deleted entries omit `attributes`.
+ */
+export interface Activity {
+    id: number;
+    event: string | null;
+    description: string;
+    causer?: { id: number; name: string } | null;
+    attribute_changes: {
+        attributes?: Record<string, unknown>;
+        old?: Record<string, unknown>;
+    } | null;
+    /** Free-form context for action entries (e.g. downloads); null for most entries. */
+    properties: Record<string, unknown> | null;
+    created_at: string | null;
 }
 
 export interface SharedProps {

@@ -8,6 +8,8 @@ arch('controllers only use approved layers')
         'App\Http\Resources',
         'App\Mail',
         'App\Models',
+        // Domain value objects (e.g. action verbs passed to Model::logAction()).
+        'App\Enums',
         'Illuminate\Http',
         'Illuminate\Support\Facades\DB',
         'Illuminate\Support\Facades\Mail',

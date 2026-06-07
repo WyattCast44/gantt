@@ -1,3 +1,4 @@
+import ActivityLog from '@/components/activity-log';
 import Avatar from '@/components/ui/avatar';
 import Badge from '@/components/ui/badge';
 import { buttonClasses } from '@/components/ui/button';
@@ -13,10 +14,10 @@ import { type BaseClassificationValue, type Document, type Project } from '@/typ
 import { allowedClassifications } from '@/utils/classification';
 import { formatDateTime } from '@/utils/date';
 import { Link, useForm, usePage } from '@inertiajs/react';
-import { ArrowLeft, Download, Eye, FileText, Info, MessageSquare, Pencil } from 'lucide-react';
+import { ArrowLeft, Download, Eye, FileText, History, Info, MessageSquare, Pencil } from 'lucide-react';
 import { type ReactNode, useMemo, useState } from 'react';
 
-type TabKey = 'preview' | 'details' | 'comments' | 'edit';
+type TabKey = 'preview' | 'details' | 'comments' | 'history' | 'edit';
 
 function useActiveTab(canEdit: boolean): TabKey {
     const page = usePage();
@@ -28,6 +29,10 @@ function useActiveTab(canEdit: boolean): TabKey {
 
     if (tab === 'comments') {
         return 'comments';
+    }
+
+    if (tab === 'history') {
+        return 'history';
     }
 
     return tab === 'details' ? 'details' : 'preview';
@@ -129,6 +134,7 @@ export default function Show({ project, document }: { project: Project; document
             href: `${showUrl}?tab=comments`,
             icon: MessageSquare,
         },
+        { key: 'history', label: 'History', href: `${showUrl}?tab=history`, icon: History },
         ...(canEdit ? [{ key: 'edit' as const, label: 'Edit', href: `${showUrl}?tab=edit`, icon: Pencil }] : []),
     ];
 
@@ -162,6 +168,7 @@ export default function Show({ project, document }: { project: Project; document
                         {tab === 'preview' && <PreviewPane document={document} />}
                         {tab === 'details' && <DetailsPane document={document} />}
                         {tab === 'comments' && <CommentsSection project={project} document={document} options={options} />}
+                        {tab === 'history' && <ActivityLog activities={document.activities} />}
                         {tab === 'edit' && canEdit && (
                             <div className="flex flex-col gap-6">
                                 <EditDocumentForm project={project} document={document} options={options} />

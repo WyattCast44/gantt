@@ -8,6 +8,7 @@ use App\Enums\ProjectStatus;
 use App\Enums\Role;
 use App\Models\Concerns\HasClassification;
 use App\Models\Concerns\HasUserStamps;
+use App\Models\Concerns\LogsModelActivity;
 use Database\Factories\ProjectFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,7 +22,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Project extends Model
 {
     /** @use HasFactory<ProjectFactory> */
-    use HasClassification, HasFactory, HasUserStamps, SoftDeletes;
+    use HasClassification, HasFactory, HasUserStamps, LogsModelActivity, SoftDeletes;
 
     /**
      * Get the attributes that should be cast.

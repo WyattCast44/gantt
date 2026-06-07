@@ -252,7 +252,7 @@ show.head = (args: { project: number | { id: number } } | [project: number | { i
 
 /**
 * @see \App\Http\Controllers\ProjectSettingsController::__invoke
-* @see app/Http/Controllers/ProjectSettingsController.php:22
+* @see app/Http/Controllers/ProjectSettingsController.php:23
 * @route '/projects/{project}/settings'
 */
 export const settings = (args: { project: number | { id: number } } | [project: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -267,7 +267,7 @@ settings.definition = {
 
 /**
 * @see \App\Http\Controllers\ProjectSettingsController::__invoke
-* @see app/Http/Controllers/ProjectSettingsController.php:22
+* @see app/Http/Controllers/ProjectSettingsController.php:23
 * @route '/projects/{project}/settings'
 */
 settings.url = (args: { project: number | { id: number } } | [project: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -300,7 +300,7 @@ settings.url = (args: { project: number | { id: number } } | [project: number | 
 
 /**
 * @see \App\Http\Controllers\ProjectSettingsController::__invoke
-* @see app/Http/Controllers/ProjectSettingsController.php:22
+* @see app/Http/Controllers/ProjectSettingsController.php:23
 * @route '/projects/{project}/settings'
 */
 settings.get = (args: { project: number | { id: number } } | [project: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -310,7 +310,7 @@ settings.get = (args: { project: number | { id: number } } | [project: number | 
 
 /**
 * @see \App\Http\Controllers\ProjectSettingsController::__invoke
-* @see app/Http/Controllers/ProjectSettingsController.php:22
+* @see app/Http/Controllers/ProjectSettingsController.php:23
 * @route '/projects/{project}/settings'
 */
 settings.head = (args: { project: number | { id: number } } | [project: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'head'> => ({

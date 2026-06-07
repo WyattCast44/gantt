@@ -1,3 +1,4 @@
+import ActivityLog from '@/components/activity-log';
 import Badge from '@/components/ui/badge';
 import Button from '@/components/ui/button';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
@@ -13,15 +14,16 @@ import AppLayout from '@/layouts/app-layout';
 import { destroy as invitationDestroy, store as invitationStore } from '@/routes/projects/invitations';
 import { destroy as memberDestroy, update as memberUpdate } from '@/routes/projects/members';
 import { archive as projectArchive, settings as projectSettings, update as projectUpdate } from '@/routes/projects';
-import { type Project, type ProjectInvitation, type ProjectMember } from '@/types';
+import { type Activity, type Project, type ProjectInvitation, type ProjectMember } from '@/types';
 import { router, useForm, usePage } from '@inertiajs/react';
-import { AlertTriangle, Copy, Settings2, Trash2, Users } from 'lucide-react';
+import { AlertTriangle, Copy, History, Settings2, Trash2, Users } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
 type SettingsProps = {
     project: Project;
     members: ProjectMember[];
     invitations: ProjectInvitation[];
+    activities: Activity[];
 };
 
 const ROLE_OPTIONS = [
@@ -30,23 +32,24 @@ const ROLE_OPTIONS = [
     { value: 'viewer', label: 'Viewer' },
 ];
 
-type TabKey = 'general' | 'members' | 'danger';
+type TabKey = 'general' | 'members' | 'history' | 'danger';
 
 function useActiveTab(): TabKey {
     const page = usePage();
     const query = new URLSearchParams(page.url.split('?')[1] ?? '');
     const tab = query.get('tab');
 
-    return tab === 'members' || tab === 'danger' ? tab : 'general';
+    return tab === 'members' || tab === 'history' || tab === 'danger' ? tab : 'general';
 }
 
-export default function Settings({ project, members, invitations }: SettingsProps) {
+export default function Settings({ project, members, invitations, activities }: SettingsProps) {
     const tab = useActiveTab();
     const settingsUrl = projectSettings.url(project.id);
 
     const tabs: SectionNavItem<TabKey>[] = [
         { key: 'general', label: 'General', href: settingsUrl, icon: Settings2 },
         { key: 'members', label: 'Members', href: `${settingsUrl}?tab=members`, icon: Users },
+        { key: 'history', label: 'History', href: `${settingsUrl}?tab=history`, icon: History },
         { key: 'danger', label: 'Danger', href: `${settingsUrl}?tab=danger`, icon: AlertTriangle },
     ];
 
@@ -63,6 +66,7 @@ export default function Settings({ project, members, invitations }: SettingsProp
                         {tab === 'members' && (
                             <MembersTab project={project} members={members} invitations={invitations} />
                         )}
+                        {tab === 'history' && <ActivityLog activities={activities} />}
                         {tab === 'danger' && <DangerTab project={project} />}
                     </div>
                 </div>

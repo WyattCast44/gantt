@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\ActivityResource;
 use App\Http\Resources\ProjectInvitationResource;
 use App\Http\Resources\ProjectMemberResource;
 use App\Http\Resources\ProjectResource;
@@ -30,6 +31,12 @@ class ProjectSettingsController
             ),
             'invitations' => ProjectInvitationResource::collection(
                 $project->invitations()->where('status', 'pending')->with('inviter')->latest()->get()
+            ),
+            // Append-only audit trail for the project (PRD §9), newest first,
+            // capped to a recent window (+1 row to flag older entries exist).
+            'activities' => ActivityResource::collection(
+                $project->activitiesAsSubject()->with('causer')->latest()
+                    ->limit(ActivityResource::RECENT_LIMIT + 1)->get()
             ),
         ]);
     }

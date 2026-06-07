@@ -8,6 +8,7 @@ namespace App\Models;
 
 use App\Enums\ThemePreference;
 use App\Models\Concerns\HasUserStamps;
+use App\Models\Concerns\LogsModelActivity;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -23,7 +24,16 @@ use Illuminate\Notifications\Notifiable;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasUserStamps, Notifiable, SoftDeletes;
+    use HasFactory, HasUserStamps, LogsModelActivity, Notifiable, SoftDeletes;
+
+    /**
+     * Attributes excluded from the activity log — the password hash must never
+     * be recorded in the audit trail. (remember_token is not fillable, so it is
+     * already outside the logged set.)
+     *
+     * @var array<int, string>
+     */
+    protected array $activityLogExcept = ['password'];
 
     /**
      * The model's default attribute values.

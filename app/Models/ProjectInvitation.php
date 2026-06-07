@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\InvitationStatus;
 use App\Enums\Role;
 use App\Models\Concerns\HasUserStamps;
+use App\Models\Concerns\LogsModelActivity;
 use Database\Factories\ProjectInvitationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -21,7 +22,7 @@ use Illuminate\Support\Str;
 class ProjectInvitation extends Model
 {
     /** @use HasFactory<ProjectInvitationFactory> */
-    use HasFactory, HasUserStamps, SoftDeletes;
+    use HasFactory, HasUserStamps, LogsModelActivity, SoftDeletes;
 
     /**
      * Number of days a pending invitation remains valid after it is issued.

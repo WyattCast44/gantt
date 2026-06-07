@@ -5,24 +5,31 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
+// App\Models\Activity is the append-only audit model extending Spatie's
+// Activity. It is intentionally exempt from the domain-model conventions below
+// (no soft deletes / user stamps / Fillable / factory / morph alias).
 arch('models')
     ->expect('App\Models')
     ->toExtend('Illuminate\Database\Eloquent\Model')
     ->ignoring('User')
+    ->ignoring('App\Models\Activity')
     ->ignoring('App\Models\Concerns');
 
 arch('models have casts')
     ->expect('App\Models')
     ->toHaveMethod('casts')
+    ->ignoring('App\Models\Activity')
     ->ignoring('App\Models\Concerns');
 
 arch('models use soft deletes')
     ->expect('App\Models')
-    ->toUse('Illuminate\Database\Eloquent\SoftDeletes');
+    ->toUse('Illuminate\Database\Eloquent\SoftDeletes')
+    ->ignoring('App\Models\Activity');
 
 arch('models use user stamps')
     ->expect('App\Models')
-    ->toUse('App\Models\Concerns\HasUserStamps');
+    ->toUse('App\Models\Concerns\HasUserStamps')
+    ->ignoring('App\Models\Activity');
 
 arch('models declare a Fillable attribute', function () {
     $models = getModels();
@@ -94,5 +101,10 @@ function getModels(): array
     return collect($models)
         ->map(function ($file) {
             return 'App\Models\\'.basename($file, '.php');
-        })->toArray();
+        })
+        // Activity is the append-only audit model (extends Spatie's Activity);
+        // it is exempt from the domain-model conventions asserted above.
+        ->reject(fn (string $model): bool => $model === 'App\Models\Activity')
+        ->values()
+        ->toArray();
 }

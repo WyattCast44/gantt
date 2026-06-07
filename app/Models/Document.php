@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\DocumentType;
 use App\Models\Concerns\HasClassification;
 use App\Models\Concerns\HasUserStamps;
+use App\Models\Concerns\LogsModelActivity;
 use Database\Factories\DocumentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -27,7 +28,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class Document extends Model
 {
     /** @use HasFactory<DocumentFactory> */
-    use HasClassification, HasFactory, HasUserStamps, SoftDeletes;
+    use HasClassification, HasFactory, HasUserStamps, LogsModelActivity, SoftDeletes;
 
     /**
      * The filesystem disk documents are stored on. Config-driven (local by

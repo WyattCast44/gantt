@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Models\Concerns\HasClassification;
 use App\Models\Concerns\HasUserStamps;
+use App\Models\Concerns\LogsModelActivity;
 use Database\Factories\CommentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -22,7 +23,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Comment extends Model
 {
     /** @use HasFactory<CommentFactory> */
-    use HasClassification, HasFactory, HasUserStamps, SoftDeletes;
+    use HasClassification, HasFactory, HasUserStamps, LogsModelActivity, SoftDeletes;
 
     /**
      * Get the attributes that should be cast.

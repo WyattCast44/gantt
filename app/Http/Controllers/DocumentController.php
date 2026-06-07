@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreDocumentRequest;
 use App\Http\Requests\UpdateDocumentRequest;
+use App\Http\Resources\ActivityResource;
 use App\Http\Resources\DocumentResource;
 use App\Http\Resources\ProjectResource;
 use App\Models\Comment;
@@ -44,7 +45,15 @@ class DocumentController
         // or lazy-loading violations per comment.
         $document->setRelation('project', $project);
 
-        $document->load(['creator', 'comments' => fn ($query) => $query->with('creator')->latest()]);
+        $document->load([
+            'creator',
+            'comments' => fn ($query) => $query->with('creator')->latest(),
+            // Append-only audit trail (PRD §9), newest first, capped to a recent
+            // window (+1 row to flag older entries exist); eager-load the causer
+            // so the resource never lazy-loads under shouldBeStrict().
+            'activitiesAsSubject' => fn ($query) => $query->with('causer')->latest()
+                ->limit(ActivityResource::RECENT_LIMIT + 1),
+        ]);
 
         $document->comments->each(
             fn (Comment $comment) => $comment->setRelation('commentable', $document),

@@ -2,7 +2,7 @@
 
 Operational Test Timeline & Dependency Management Platform
 
-_Version 10 - Phases 1–5 Implemented (Architecture, Auth & RBAC, Project Topologies + Workspace Shell + Membership, Document Ingestion, Polymorphic Commenting)_
+_Version 11 - Phases 1–5 Implemented (Architecture, Auth & RBAC, Project Topologies + Workspace Shell + Membership, Document Ingestion, Polymorphic Commenting) + Activity-Logging Foundation (pre–Phase 6)_
 
 # Overview
 
@@ -691,7 +691,7 @@ Deploy the polymorphic comment schema and hook threads onto Document first to pr
 
 ### Phase 6 - Task Core Lifecycle & Temporal Logic Plumbing
 
-Build atomic CRUD for the 5-tier recursive Task structure. Per C5 (no service layer), `start_date`/`duration_days` logic lives on the `Task` model (domain methods + scopes) with controllers staying thin; keep MVP logic simple (manual locking first) before layering in cascading propagation. Dispatch domain events (TaskCreated, TaskUpdated) on create/update and register simple immediate listeners for internal state and system logging — this is where the generic event/listener foundation (deferred in Phase 3) gets built.
+Build atomic CRUD for the 5-tier recursive Task structure. Per C5 (no service layer), `start_date`/`duration_days` logic lives on the `Task` model (domain methods + scopes) with controllers staying thin; keep MVP logic simple (manual locking first) before layering in cascading propagation. Dispatch domain events (TaskCreated, TaskUpdated) on create/update and register simple immediate listeners for internal state and system logging — this is where the generic event/listener foundation (deferred in Phase 3) gets built. **\[ACTIVITY-LOG NOTE\]** The append-only audit trail (PRD §9) is already built (see the Activity-Logging Foundation status section below); Task picks it up simply by adding `use LogsModelActivity;`. Note the audit trail is captured via Eloquent model events (Spatie), independent of the generic domain-event bus Phase 6 still introduces — the two are complementary, not the same mechanism.
 
 ### Phase 7 - UI Design System & Gantt State Engine
 
@@ -863,6 +863,38 @@ This section records what Phase 5 added on top of the Phase 1–4 foundation. Ph
 
 ## Phase 6 Starting Point
 The polymorphic comment plumbing is proven end-to-end on `Document`. Phase 6 (Task Core Lifecycle) can: register the `task` morph alias, add `Task::comments(): MorphMany`, add the `CommentFactory::forTask()` state, and reuse `CommentsSection` on the task detail view. The `update`/`delete` abilities and `CommentResource` already generalize over any commentable whose project is resolvable via `commentable->project`; only the `create` gate (typed to `Document` today, and the document-scoped `CommentController`/routes) needs a task-scoped counterpart. The generic domain-event/listener foundation (`TaskCreated`/`TaskUpdated`, and retrofitting a `CommentCreated` listener) is also built in Phase 6.
+
+# Implementation Status & Established Conventions (Activity-Logging Foundation — pre–Phase 6)
+
+This section records the append-only audit-log foundation (PRD §9 / FR-9 / A10) built **between Phases 5 and 6**, ahead of the Task work so Tasks inherit auditing for free. Fully tested (164 tests passing).
+
+## Product decisions (Activity-Logging Foundation)
+- **One trait, all models:** a single shared concern is applied to every domain model so capture is uniform; a model never hand-rolls its own logging.
+- **Append-only is enforced, not just intended:** audit entries are immutable at the Eloquent layer — any attempt to update or delete one throws. The underlying domain data stays mutable; only the trail is frozen. The `activitylog:clean` command is deliberately **not** scheduled.
+- **What is logged:** each model's `#[Fillable]` set, dirty values only, empty changesets skipped. The causer is the authenticated user. Secrets are excluded per model (the `User` password is never recorded).
+- **Read surface now:** activity is surfaced today on the **Documents show page** (a "History" tab) and the **Project Settings** page (a "History" tab) to prove the read path end-to-end; the Task detail view picks up the same component in Phase 6.
+
+## Backend
+- **Package:** `spatie/laravel-activitylog` **5.0.0** (a revised API vs older v4 docs). The trait lives at `Spatie\Activitylog\Models\Concerns\LogsActivity`; the subject relation is **`activitiesAsSubject()`** (not `activities()`); `attribute_changes` is a real column populated natively (shape `{ attributes: {…new}, old: {…prev} }` — `created` omits `old`, `deleted` omits `attributes`); the empty-log toggle is `dontLogEmptyChanges()`. The `properties` column is left free for `withProperties()` (the future per-change **reason** field, §9).
+- **Shared trait** — `app/Models/Concerns/LogsModelActivity.php` composes Spatie's `LogsActivity` with `logFillable()->logOnlyDirty()->dontLogEmptyChanges()->useLogName('default')`. Per-model exclusions come from an optional `protected array $activityLogExcept`, read via a `property_exists`-guarded method so Eloquent's `__get` (which would throw under `Model::shouldBeStrict()` for an undeclared property) is bypassed. Applied to **Project, Document, Comment, ProjectInvitation, User**; `User` sets `['password']`.
+- **Custom Activity model** — `app/Models/Activity.php` extends Spatie's `Activity` and is registered via `config/activitylog.php` (`activity_model`). Its `booted()` rejects `updating`/`deleting` (append-only). It is intentionally **exempt** from the domain-model arch conventions (no SoftDeletes/HasUserStamps/Fillable/factory/morph alias): `ModelsArchTest` ignores `App\Models\Activity` in the namespace expectations and rejects it from `getModels()`. (The `activity_log` migration was already excluded from `MigrationsArchTest`.)
+- **API Resource** — `ActivityResource` (`event`, `description`, `causer` via `whenLoaded`, `attribute_changes`, ISO8601 `created_at`). `DocumentResource` gained `activities` (`whenLoaded('activitiesAsSubject')`, absent on the index to keep it lean). `DocumentController@show` and `ProjectSettingsController` eager-load `activitiesAsSubject` with `causer` (avoids `shouldBeStrict` lazy-loading) and pass it to the page.
+
+## Frontend
+- **Reusable component** — `resources/js/components/activity-log.tsx` renders the newest-first trail (causer avatar + event badge + relative timestamp + a compact `old → new` per-field diff), with an empty state. Used by both the Documents show page and the Project Settings page. No new dependencies (reuses `components/ui` primitives + `formatRelativeDate`/`formatDateTime`).
+- **Types** — `@/types` gained `Activity`; `Document` gained `activities: Activity[]`.
+
+## Action logging (user actions on resources)
+Beyond attribute-change logging (Spatie's auto `created`/`updated`/`deleted`), the trait also records discrete **actions** a user performs on a resource that don't mutate it and so are invisible to the change logger.
+- **`ActivityAction` enum** (`app/Enums/ActivityAction.php`, string-backed, `label()`) is the catalog of action verbs: `Downloaded` (wired), plus `Previewed` / `Exported` defined for the vocabulary (wired later). Named to avoid clashing with Spatie's own `ActivityEvent` enum.
+- **`LogsModelActivity::logAction(ActivityAction, array $properties = [])`** logs via Spatie's fluent `activity()` logger (`performedOn($this)`, `event(...)`, causer auto-resolved, append-only via the custom `Activity` model). Available on every model, so any resource gets consistent one-line action logging.
+- **Metadata seam:** `logAction()` merges a per-model `activityActionMeta()` (returns `[]` today, so nothing extra is persisted) over any explicit `$properties` and writes the result to the entry's existing **`properties`** column (skipped when empty, so it stays null). `activityActionMeta()` is the single place to later add request context (IP, user-agent, …) — every action log picks it up automatically with no call-site changes. No new column or migration.
+- **Wired now:** `Document::download()` calls `logAction(ActivityAction::Downloaded)` (the invokable `DownloadDocumentController` stays thin per C5); inline preview is intentionally **not** logged (it fires on every show-page open — noisy view-tracking, deferred).
+- **Read surface:** `ActivityResource` exposes `properties`; `components/activity-log.tsx` maps the action verbs in `EVENT_LABELS` and renders `properties` when present. Action entries (no `attribute_changes`) render cleanly as causer + event badge + time and flow through the same `activitiesAsSubject()` History tab — no new read plumbing.
+- **Deferred:** preview/view logging; a subject-less helper for global/account events (`logAction()` always attaches to a resource); populating `activityActionMeta()`.
+
+## Phase 6 hookup
+Adding the audit trail to `Task` is a one-liner: `use LogsModelActivity;` on the model. The Task detail view reuses `components/activity-log.tsx` (load `activitiesAsSubject` with `causer`, expose via the task's resource). Task-specific tracked fields (start/end/duration/dependency/lock changes per §9) are captured automatically once those columns are in the model's `#[Fillable]` set. The optional per-change **reason/comment** (§9) remains unbuilt — it will ride on the activity `properties` bag via `withProperties(['reason' => …])` when a UI for it is added.
 
 # Architecture Issues - Resolved
 
