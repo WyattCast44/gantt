@@ -3,6 +3,9 @@ import RestoreProjectController from './RestoreProjectController'
 import ProjectSettingsController from './ProjectSettingsController'
 import ProjectMemberController from './ProjectMemberController'
 import ProjectInvitationController from './ProjectInvitationController'
+import DocumentController from './DocumentController'
+import DownloadDocumentController from './DownloadDocumentController'
+import PreviewDocumentController from './PreviewDocumentController'
 import InvitationController from './InvitationController'
 import AcceptInvitationController from './AcceptInvitationController'
 import DeclineInvitationController from './DeclineInvitationController'
@@ -15,6 +18,9 @@ const Controllers = {
     ProjectSettingsController: Object.assign(ProjectSettingsController, ProjectSettingsController),
     ProjectMemberController: Object.assign(ProjectMemberController, ProjectMemberController),
     ProjectInvitationController: Object.assign(ProjectInvitationController, ProjectInvitationController),
+    DocumentController: Object.assign(DocumentController, DocumentController),
+    DownloadDocumentController: Object.assign(DownloadDocumentController, DownloadDocumentController),
+    PreviewDocumentController: Object.assign(PreviewDocumentController, PreviewDocumentController),
     InvitationController: Object.assign(InvitationController, InvitationController),
     AcceptInvitationController: Object.assign(AcceptInvitationController, AcceptInvitationController),
     DeclineInvitationController: Object.assign(DeclineInvitationController, DeclineInvitationController),

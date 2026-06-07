@@ -15,7 +15,7 @@ export function sidebarNavLinkClasses(active: boolean, collapsed: boolean, disab
     if (collapsed) {
         return active
             ? activeNavLinkCollapsedClasses
-            : 'font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-white';
+            : 'border border-transparent font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:border-transparent dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-white';
     }
 
     return cn(

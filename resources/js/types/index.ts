@@ -11,6 +11,17 @@ export const ROLE_LABELS: Record<Role, string> = {
 
 export type ProjectStatus = 'active' | 'completed';
 
+export type BaseClassificationValue = 'unclassified' | 'cui' | 'confidential' | 'secret' | 'top_secret';
+
+/** Classification markings ordered from least to most restrictive. */
+export const CLASSIFICATIONS: { value: BaseClassificationValue; label: string }[] = [
+    { value: 'unclassified', label: 'Unclassified' },
+    { value: 'cui', label: 'CUI' },
+    { value: 'confidential', label: 'Confidential' },
+    { value: 'secret', label: 'Secret' },
+    { value: 'top_secret', label: 'Top Secret' },
+];
+
 export interface User {
     id: number;
     name: string;
@@ -79,6 +90,24 @@ export interface ProjectInvitation {
     invited_by?: string | null;
     project?: { name: string };
     accept_url: string;
+}
+
+/** A project document (DocumentResource). */
+export interface Document {
+    id: number;
+    name: string;
+    description: string | null;
+    type: Labeled;
+    mime_type: string;
+    original_filename: string;
+    size_bytes: number;
+    size_label: string;
+    base_classification: Labeled<BaseClassificationValue>;
+    uploaded_by?: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+    download_url: string;
+    preview_url: string;
 }
 
 export interface SharedProps {

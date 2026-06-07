@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -22,6 +23,18 @@ arch('models use soft deletes')
 arch('models use user stamps')
     ->expect('App\Models')
     ->toUse('App\Models\Concerns\HasUserStamps');
+
+arch('models declare a Fillable attribute', function () {
+    $models = getModels();
+
+    foreach ($models as $model) {
+        $attributes = (new ReflectionClass($model))->getAttributes(Fillable::class);
+
+        expect($attributes)->not->toBeEmpty(
+            sprintf('The %s model is missing the #[Fillable] attribute.', $model),
+        );
+    }
+});
 
 arch('ensure factories', function () {
     $models = getModels();

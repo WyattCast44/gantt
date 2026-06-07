@@ -14,5 +14,8 @@ arch('controllers only use approved layers')
         'Illuminate\Foundation\Auth\Access\AuthorizesRequests',
         'Inertia',
         'redirect',
+        // Streamed/file-download responses (e.g. document downloads) are typed
+        // against Symfony's HTTP foundation; the file I/O itself lives on models.
+        'Symfony\Component\HttpFoundation',
     ])
     ->ignoring('App\Http\Controllers\Concerns');

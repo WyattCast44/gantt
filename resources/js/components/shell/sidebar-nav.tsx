@@ -6,6 +6,7 @@ import {
     settings as projectSettings,
     show as projectShow,
 } from '@/routes/projects';
+import { index as documentsIndex } from '@/routes/projects/documents';
 import { type Project, type SharedProps } from '@/types';
 import { cn } from '@/utils/cn';
 import { focusRingNeutral } from '@/utils/focusRing';
@@ -19,7 +20,6 @@ import {
     LayoutGrid,
     ListTree,
     type LucideIcon,
-    MessageSquare,
     Settings,
 } from 'lucide-react';
 
@@ -55,6 +55,7 @@ function globalItems(current: string): NavLink[] {
 
 function projectItems(project: Project, current: string): NavLink[] {
     const overviewUrl = projectShow.url(project.id);
+    const documentsUrl = documentsIndex.url(project.id);
     const settingsUrl = projectSettings.url(project.id);
     const onSettings = current.startsWith(settingsUrl);
 
@@ -63,8 +64,7 @@ function projectItems(project: Project, current: string): NavLink[] {
         { key: 'timeline', label: 'Timeline', icon: GanttChartSquare, disabled: true },
         { key: 'tasks', label: 'Tasks', icon: ListTree, disabled: true },
         { key: 'calendar', label: 'Calendar', icon: Calendar, disabled: true },
-        { key: 'documents', label: 'Documents', icon: FileText, disabled: true },
-        { key: 'comments', label: 'Comments', icon: MessageSquare, disabled: true },
+        { key: 'documents', label: 'Documents', icon: FileText, href: documentsUrl, active: current.startsWith(documentsUrl) },
     ];
 
     if (project.can.updateSettings) {

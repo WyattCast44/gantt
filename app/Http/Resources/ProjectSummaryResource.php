@@ -24,7 +24,10 @@ class ProjectSummaryResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
-            'role' => $this->pivot?->role,
+            // Projects loaded via User::projects() carry a project_user pivot;
+            // owned/archived projects (hasMany) do not. Guard the access so it
+            // is safe under Model::shouldBeStrict().
+            'role' => $this->resource->relationLoaded('pivot') ? $this->pivot->role : null,
             'status' => $this->status->value,
         ];
     }

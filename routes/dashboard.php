@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 use App\Http\Controllers\AcceptInvitationController;
 use App\Http\Controllers\DeclineInvitationController;
+use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\DownloadDocumentController;
 use App\Http\Controllers\InvitationController;
+use App\Http\Controllers\PreviewDocumentController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectInvitationController;
 use App\Http\Controllers\ProjectMemberController;
@@ -77,6 +80,39 @@ Route::delete('/projects/{project}/invitations/{invitation}', [ProjectInvitation
     ->middleware('project.member')
     ->scopeBindings()
     ->name('projects.invitations.destroy');
+
+Route::get('/projects/{project}/documents', [DocumentController::class, 'index'])
+    ->middleware('project.member')
+    ->name('projects.documents.index');
+
+Route::post('/projects/{project}/documents', [DocumentController::class, 'store'])
+    ->middleware('project.member')
+    ->name('projects.documents.store');
+
+Route::get('/projects/{project}/documents/{document}', [DocumentController::class, 'show'])
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.documents.show');
+
+Route::patch('/projects/{project}/documents/{document}', [DocumentController::class, 'update'])
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.documents.update');
+
+Route::delete('/projects/{project}/documents/{document}', [DocumentController::class, 'destroy'])
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.documents.destroy');
+
+Route::get('/projects/{project}/documents/{document}/download', DownloadDocumentController::class)
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.documents.download');
+
+Route::get('/projects/{project}/documents/{document}/preview', PreviewDocumentController::class)
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.documents.preview');
 
 /*
 |-----------------------------------------------------------------------------

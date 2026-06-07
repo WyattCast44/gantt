@@ -5,36 +5,32 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Enums\BaseClassification;
+use App\Models\Document;
 use App\Models\Project;
 use App\Models\ProjectInvitation;
 use App\Models\User;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
-    public function register(): void
-    {
-        //
-    }
-
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
-        // Inertia (not REST): resources shape props directly, so drop the
-        // top-level "data" envelope from resource payloads.
-        JsonResource::withoutWrapping();
-
         $this
             ->configureModelMorphMap()
-            ->configureMigrationMacros();
+            ->configureMigrationMacros()
+            ->configureCommands()
+            ->configureDates()
+            ->configureModels()
+            ->configurePasswordValidation()
+            ->configureJSONResources();
     }
 
     private function configureModelMorphMap(): static
@@ -43,6 +39,7 @@ class AppServiceProvider extends ServiceProvider
             'user' => User::class,
             'project' => Project::class,
             'project_invitation' => ProjectInvitation::class,
+            'document' => Document::class,
         ]);
 
         return $this;
@@ -68,6 +65,43 @@ class AppServiceProvider extends ServiceProvider
             $this->json('handling_caveats')->nullable(); // SCI fields, for example: ['SI', 'TK']
             $this->json('programs')->nullable(); // [['name' => 'PID', 'level' => 'top_secret'|'secret']] // basically a list of the SAR programs and levels for the row
         });
+
+        return $this;
+    }
+
+    private function configureCommands(): static
+    {
+        DB::prohibitDestructiveCommands(
+            $this->app->environment('production')
+        );
+
+        return $this;
+    }
+
+    private function configureDates(): static
+    {
+        Date::use(CarbonImmutable::class);
+
+        return $this;
+    }
+
+    private function configureModels(): static
+    {
+        Model::shouldBeStrict(! $this->app->environment('production'));
+
+        return $this;
+    }
+
+    private function configurePasswordValidation(): static
+    {
+        Password::defaults(fn () => $this->app->environment('production') ? Password::min(8) : null);
+
+        return $this;
+    }
+
+    private function configureJSONResources(): static
+    {
+        JsonResource::withoutWrapping();
 
         return $this;
     }

@@ -68,3 +68,122 @@
         background: var(--scrollbar-track);
     }
 }
+
+@layer components {
+    .logo-icon .logo-bar {
+        transform-box: fill-box;
+        transform-origin: left center;
+        transition: transform 0.45s ease;
+    }
+
+    .logo-hovered .logo-icon .logo-bar {
+        transition: none;
+    }
+
+    .logo-hovered .logo-icon .logo-bar-1 {
+        animation: logo-bar-1 2.8s ease-in-out infinite;
+    }
+
+    .logo-hovered .logo-icon .logo-bar-2 {
+        animation: logo-bar-2 3.2s ease-in-out 0.12s infinite;
+    }
+
+    .logo-hovered .logo-icon .logo-bar-3 {
+        animation: logo-bar-3 2.6s ease-in-out 0.28s infinite;
+    }
+
+    .logo-hovered .logo-icon .logo-bar-4 {
+        animation: logo-bar-4 3.5s ease-in-out 0.08s infinite;
+    }
+
+    @keyframes logo-bar-1 {
+        0%,
+        100% {
+            transform: scaleX(1);
+        }
+
+        18% {
+            transform: scaleX(0.78);
+        }
+
+        42% {
+            transform: scaleX(0.92);
+        }
+
+        68% {
+            transform: scaleX(0.71);
+        }
+
+        86% {
+            transform: scaleX(0.96);
+        }
+    }
+
+    @keyframes logo-bar-2 {
+        0%,
+        100% {
+            transform: scaleX(1);
+        }
+
+        25% {
+            transform: scaleX(0.68);
+        }
+
+        55% {
+            transform: scaleX(0.85);
+        }
+
+        80% {
+            transform: scaleX(0.62);
+        }
+    }
+
+    @keyframes logo-bar-3 {
+        0%,
+        100% {
+            transform: scaleX(1);
+        }
+
+        15% {
+            transform: scaleX(0.74);
+        }
+
+        38% {
+            transform: scaleX(0.58);
+        }
+
+        62% {
+            transform: scaleX(0.88);
+        }
+
+        88% {
+            transform: scaleX(0.65);
+        }
+    }
+
+    @keyframes logo-bar-4 {
+        0%,
+        100% {
+            transform: scaleX(1);
+        }
+
+        30% {
+            transform: scaleX(0.52);
+        }
+
+        50% {
+            transform: scaleX(0.78);
+        }
+
+        75% {
+            transform: scaleX(0.48);
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .logo-hovered .logo-icon .logo-bar {
+            animation: none;
+            transition: none;
+        }
+    }
+}

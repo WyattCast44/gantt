@@ -89,6 +89,16 @@ class Project extends Model
     }
 
     /**
+     * Documents uploaded to this project.
+     *
+     * @return HasMany<Document, $this>
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(Document::class);
+    }
+
+    /**
      * Determine whether the given user owns this project.
      */
     public function isOwner(User $user): bool

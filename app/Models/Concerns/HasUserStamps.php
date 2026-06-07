@@ -29,7 +29,9 @@ trait HasUserStamps
         if (in_array(SoftDeletes::class, class_uses_recursive(static::class))) {
             static::deleting(function (Model $model): void {
                 if (Auth::check() && ! $model->isForceDeleting()) {
-                    $model->updateQuietly(['deleted_by' => Auth::id()]);
+                    // forceFill so the audit stamp bypasses mass-assignment
+                    // guarding (deleted_by is intentionally not #[Fillable]).
+                    $model->forceFill(['deleted_by' => Auth::id()])->saveQuietly();
                 }
             });
         }

@@ -49,7 +49,7 @@ export default function Index({ projects, archivedProjects, pendingInvitations }
                 />
 
                 {pendingInvitations.length > 0 && (
-                    <Card className="p-0">
+                    <Card padding="none">
                         <div className="border-b border-border px-4 py-2.5 text-sm font-semibold text-slate-900 dark:border-border-dark dark:text-white">
                             Pending invitations
                         </div>
@@ -123,7 +123,7 @@ export default function Index({ projects, archivedProjects, pendingInvitations }
                 {archivedProjects.length > 0 && (
                     <div>
                         <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Archived</h2>
-                        <Card className="mt-2 p-0">
+                        <Card padding="none" className="mt-2">
                             <ul className="divide-y divide-border dark:divide-border-dark">
                                 {archivedProjects.map((project) => (
                                     <li key={project.id} className="flex items-center justify-between gap-3 px-4 py-3">

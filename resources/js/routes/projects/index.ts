@@ -1,6 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, applyUrlDefaults } from './../../wayfinder'
 import members from './members'
 import invitations from './invitations'
+import documents from './documents'
 /**
 * @see \App\Http\Controllers\ProjectController::index
 * @see app/Http/Controllers/ProjectController.php:27
@@ -444,6 +445,7 @@ const projects = {
     archive: Object.assign(archive, archive),
     members: Object.assign(members, members),
     invitations: Object.assign(invitations, invitations),
+    documents: Object.assign(documents, documents),
 }
 
 export default projects

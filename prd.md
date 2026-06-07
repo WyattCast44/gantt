@@ -2,7 +2,7 @@
 
 Operational Test Timeline & Dependency Management Platform
 
-_Version 8 - Phases 1–3 Implemented (Architecture, Auth & RBAC, Project Topologies + Workspace Shell + Membership)_
+_Version 9 - Phases 1–4 Implemented (Architecture, Auth & RBAC, Project Topologies + Workspace Shell + Membership, Document Ingestion)_
 
 # Overview
 
@@ -660,7 +660,7 @@ The following conventions are enforced project-wide (where practical, via the Pe
   - **FormRequests** own authorization + validation, including cross-field/domain guards (e.g., the invite guards: cannot invite the owner, an existing member, or create a duplicate pending invitation) via `prepareForValidation()` and the `after()` validation hook.
   - **Rich models** own domain behavior and multi-write/stateful transitions: e.g. `ProjectInvitation::accept()` (transactional pivot attach + status flip), `decline()`/`revoke()`, the `creating` hook that defaults token/status/expiry, and query scopes (`pending()`, `forEmail()`); `Project::updateMemberRole()` / `removeMember()` (with owner-protection guards).
   - **Controllers** stay thin: resolve the request, call model/Eloquent methods, dispatch a Mailable where needed, and return an Inertia response or redirect.
-- **\[ARCHITECTURE\]** Controller arch-test allowlist (A6) was updated accordingly. Controllers may use: `App\Http\Requests`, `App\Http\Resources`, `App\Mail`, `App\Models`, `Illuminate\Http`, the `DB` and `Mail` facades, `AuthorizesRequests`, `Inertia`, and the `redirect` helper. The earlier "controllers must not touch the DB facade" rule was **removed** as too restrictive (it forced needless indirection); transactions and raw queries are permitted but, by the convention above, generally live on models.
+- **\[ARCHITECTURE\]** Controller arch-test allowlist (A6) was updated accordingly. Controllers may use: `App\Http\Requests`, `App\Http\Resources`, `App\Mail`, `App\Models`, `Illuminate\Http`, the `DB` and `Mail` facades, `AuthorizesRequests`, `Inertia`, and the `redirect` helper. **\[PHASE 4 UPDATE\]** `Symfony\Component\HttpFoundation` was added for streamed file-download responses (the document download controller returns a `StreamedResponse`); the file I/O itself stays on the model, not the controller. The earlier "controllers must not touch the DB facade" rule was **removed** as too restrictive (it forced needless indirection); transactions and raw queries are permitted but, by the convention above, generally live on models.
 - **\[ARCHITECTURE\]** Controllers conform to the Laravel preset's resourceful-method rule: actions are limited to standard names (`index/create/store/show/edit/update/destroy`) or are **single-action invokable** controllers. Non-resourceful operations therefore get their own invokable controller (e.g., `RestoreProjectController`, `AcceptInvitationController`, `DeclineInvitationController`, `SidebarCollapsedController`, `SidebarWidthController`).
 
 # Build Roadmap
@@ -681,9 +681,9 @@ Delivered project CRUD (create / edit / archive / restore), the per-project Sett
 
 (Originally scoped as "route write actions through FormRequests + a Service"; the Service part was dropped — see C5.)
 
-### Phase 4 - Document Ingestion Subsystem
+### Phase 4 - Document Ingestion Subsystem — ✅ COMPLETED
 
-Multi-MIME upload controllers bound to project context, with an abstract storage layer (local vs. cloud) and automated metadata indexing plus audit trails.
+Multi-MIME upload controllers bound to project context, with an abstract storage layer (local vs. cloud) and automated metadata indexing plus audit trails. Delivered: the `documents` table + rich `Document` model with per-field classification (constrained by the project baseline), a config-driven `documents` disk (private `local` by default, swappable to `s3`), upload/update/delete + authorized streamed download/inline-preview controllers, the Documents index and show page (upload modal, list, click-through, inline preview, download, edit, delete), and unit/feature/browser tests. See "Implementation Status & Established Conventions (through Phase 4)".
 
 ### Phase 5 - Polymorphic Commenting Infrastructure
 
@@ -721,7 +721,7 @@ This section records what has actually been built and the engineering convention
 - **Morph map** — `Relation::enforceMorphMap(['user' => User, 'project' => Project, …])` in `AppServiceProvider`; every polymorphic participant must be registered here (no FQCN in the DB).
 - **Project** — `owner_id` FK (single authoritative owner), `members()` belongsToMany over `project_user` (`role` pivot column), `owner()` belongsTo, plus `roleFor()` / `isOwner()` / `isMember()`. A `booted()` `created` hook mirrors the owner into the pivot (role `owner`) so `members()` and `User::projects()` are single-query.
 - **User** — `theme` column with a `$attributes` default (so freshly created instances are never null), `ownedProjects()` (hasMany) and `projects()` (belongsToMany = all accessible projects).
-- Model shape: `#[Fillable([...])]` attribute, a `casts()` method, `SoftDeletes`, and a factory with semantic states (`withOwner`, `withMember`). All enforced by `tests/Feature/Arch`.
+- Model shape: a `#[Fillable([...])]` attribute, a `casts()` method, `SoftDeletes`, and a factory with semantic states (`withOwner`, `withMember`). All enforced by `tests/Feature/Arch` (the `#[Fillable]` requirement is enforced by a dedicated `ModelsArchTest` case as of Phase 4).
 
 ### Authentication (headless Fortify)
 
@@ -790,6 +790,45 @@ This section records what Phase 3 added on top of the Phase 1–2 foundation, an
 ## Phase 4 Starting Point
 
 Project CRUD, membership, invitations, the app shell, the switcher, and the full design-system + arch conventions (C1–C5) are in place. Phase 4 (Document Ingestion) should follow C5 (skinny controllers / rich models / FormRequests / API Resources), register any new polymorphic models in the morph map, use the migration macros, and reuse the shell + `components/ui` primitives for any UI. Note: the generic domain-event/listener foundation is still **not** built (deferred to Phase 6); only invitation email is delivered today.
+
+# Implementation Status & Established Conventions (through Phase 4)
+
+This section records what Phase 4 added on top of the Phase 1–3 foundation. Phases 1–4 are complete and fully tested (135 tests passing at the close of Phase 4).
+
+## Backend (Phase 4)
+
+### Framework hardening
+- **`AppServiceProvider::boot()`** was reorganized into small `configure*()` steps and gained app-wide guardrails: `Model::shouldBeStrict()` (non-production), `Date::use(CarbonImmutable)`, `Password::defaults()` (min-8 in production), and `DB::prohibitDestructiveCommands()` (production). Mass-assignment protection stays **on**: every model declares an explicit `#[Fillable]` allowlist (enforced by a new `ModelsArchTest` case so it can't regress), and controllers set non-fillable/server-derived fields explicitly rather than mass-assigning them. `shouldBeStrict()` is what surfaced the `ProjectSummaryResource` pivot guard (now `relationLoaded('pivot')`).
+- **`HasUserStamps`** stamps the audit columns (`created_by`/`updated_by`/`deleted_by`) directly, never via mass assignment — the soft-delete hook uses `forceFill(...)->saveQuietly()` so the stamp bypasses the `#[Fillable]` guard (these columns are intentionally not fillable).
+
+### Storage
+- **`documents` disk** (`config/filesystems.php`) — config-driven via `DOCUMENTS_DISK_DRIVER` (private `local` by default, `s3`-swappable without code changes), rooted at `storage/app/private/documents`. This is the abstract local-vs-cloud storage layer A7 calls for. The disk name is pinned to a single constant `Document::DISK` so the storage target lives in one place. Uploads are stored under a per-project subdirectory (`{project_id}/…`); files are never publicly served — they are streamed through an authorized download route only.
+
+### Enums
+- **`DocumentType`** (string-backed) — `Pdf` / `Image` / `Spreadsheet` / `Document` / `Other`; `label()` and a static `fromMime(string): self` that buckets an uploaded MIME type into a display group. Keeps file-category copy out of the React layer.
+
+### Data model
+- **`documents` table** — `project_id` (cascade), `name`, `description`, `disk`, `path`, `original_filename`, `mime_type`, `size_bytes`, `checksum` (sha256), the `classification()` macro (per-field marking, default UNCLASSIFIED), plus `userStamps()` + `softDeletesWithUserStamps()`. Morph alias `document` (registered now; reused by Phase 5 comments). Index on `project_id`.
+- **`Document` model (rich)** — traits `HasClassification`, `HasFactory`, `HasUserStamps`, `SoftDeletes`; `const DISK`; **`#[Fillable]`** limited to the user-editable fields (`name`, `description`, `base_classification`) — storage metadata (`disk`, `path`, `original_filename`, `mime_type`, `size_bytes`, `checksum`) is intentionally non-fillable and set explicitly by the controller, never mass-assigned. Relation `project()`; scope `forProject()`; `type(): DocumentType` (derived from the stored MIME, content-guessed via `getMimeType()` at upload). Domain/file behavior lives on the model (per C5): `download(): StreamedResponse` (attachment), `inline(): StreamedResponse` (in-browser preview — inline disposition + `X-Content-Type-Options: nosniff`, both reading the content-derived stored MIME), and `deleteWithFile()` (soft-deletes the audit row in a transaction, then hard-deletes the blob after commit so a row failure leaves the file intact — filesystem deletes cannot join the DB transaction).
+- **`Project` model** gained `documents(): HasMany`.
+- **Audit trail** is the existing `HasUserStamps` macro (uploader = `created_by`, `deleted_by` on delete). The generic domain-event bus remains deferred to Phase 6 — no `DocumentUploaded` event yet.
+
+### HTTP / routing
+- **Controllers (skinny, no services — C5):** `DocumentController` (`index/show/store/update/destroy`) and invokable `DownloadDocumentController` (attachment) + `PreviewDocumentController` (inline preview), both returning the model's `StreamedResponse`. `destroy` redirects to the index (not `back()`) so deleting from the show page lands on a valid URL.
+- **FormRequests:** `StoreDocumentRequest` (file + metadata + classification; `after()` guard rejecting a marking the project baseline does not `dominates()`; typed `classification()` accessor) and `UpdateDocumentRequest` (metadata-only, same classification guard).
+- **API Resource:** `DocumentResource` — `type`/`base_classification` as `{value,label}`, computed `size_label` (`Number::fileSize`), `download_url`, `preview_url`, and `uploaded_by` (`whenLoaded('creator')`). It carries **no per-document `can{}` block**: edit/delete abilities depend only on the project, so the frontend reuses the project-level `ProjectResource.can.update` (avoids an N+1 re-evaluating the policy per row). Upload/edit/delete gate on `ProjectPolicy::update` (editors+, via the FormRequest or `authorize('update')`); index/download rely on the `project.member` membership middleware — **no separate DocumentPolicy**, and the controllers no longer duplicate the middleware's `view` check.
+- **Routes** (`routes/dashboard.php`, project-scoped behind `project.member`): `projects.documents.index/show/store/update/destroy`, `projects.documents.download`, and `projects.documents.preview` (write/scoped routes use `scopeBindings()`).
+- **Arch allowlist:** `Symfony\Component\HttpFoundation` added for the streamed download response type (A6/C5 note).
+
+## Frontend (Phase 4)
+- **Documents index** (`resources/js/Pages/Documents/Index.tsx`) — `PageHeader` + upload modal, a table listing name/type/classification badges/size/uploader, a row-level **Download** anchor (a plain `<a>`, not Inertia `Link`, so the browser performs the download), **Edit** modal, and **Delete** `ConfirmDialog`. Each row is **click-through to the show page** (`router.visit`); the action cell calls `stopPropagation()` so its buttons don't also navigate. Empty-state card when there are no documents.
+- **Document show page** (`resources/js/Pages/Documents/Show.tsx`) — back link + title + header **Download**, with a `SectionNav` (`?tab=` query, like Settings) of **Preview / Details / Edit** (Edit only when `project.can.update`). Preview renders an inline `<img>` for images and an `<iframe>` for PDFs (both off `preview_url`), with a download fallback for other types. Edit hosts the shared edit form plus a delete danger action. This is the surface Phase 5 comments will attach to. *(Versions/Attachments were intentionally omitted — no backing models yet.)*
+- **Shared partials/utils** — the document edit form was extracted to `Partials/EditDocumentForm` (used inline on the show page and wrapped by `Partials/EditDocumentModal`); the baseline-capped classification list helper lives in `@/utils/classification`.
+- **Sidebar** — the previously-disabled **Documents** nav item is now an active link (`components/shell/sidebar-nav`).
+- **Types** — `@/types` gained `Document` (incl. `download_url`/`preview_url`), `BaseClassificationValue`, and the ordered `CLASSIFICATIONS` constant.
+
+## Phase 5 Starting Point
+Document ingestion (model, storage, controllers, index **and show page**) is in place and the `document` morph alias is registered. The show page is the intended host for comment threads: Phase 5 (Polymorphic Commenting) can hook comments onto `Document` (e.g. a new Comments section/tab on `Documents/Show`) to prove the polymorphic plumbing before wiring it to Tasks. The domain-event/listener foundation is still deferred to Phase 6.
 
 # Architecture Issues - Resolved
 
