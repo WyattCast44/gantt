@@ -2,7 +2,7 @@
 
 Operational Test Timeline & Dependency Management Platform
 
-_Version 7 - Phases 1–2 Implemented (Architecture, Auth & RBAC)_
+_Version 8 - Phases 1–3 Implemented (Architecture, Auth & RBAC, Project Topologies + Workspace Shell + Membership)_
 
 # Overview
 
@@ -366,6 +366,7 @@ Each log entry records:
 The platform defines a notification model with a notification inbox, assignment alerts, task update alerts, and mention/ping notifications. However, the user-facing DELIVERY layer (email, in-app alert center, SMS) is deferred to a later phase. In Version 1 the system fires the underlying domain events (see Architecture section A10) so no core logic must change when delivery is added later.
 
 - **\[V1 DECISION\]** Clarification: the original draft listed notifications as a fully delivered V1 feature. The refined approach separates the event (the recorded fact that something happened) from the notification (delivery to a human). V1 dispatches and logs events; human-facing delivery channels are a future phase.
+- **\[PHASE 3 UPDATE\]** Exception — **project invitation email is delivered now.** Inviting a member queues a `ProjectInvitationMail` (Laravel Mailable) containing a tokenized accept link. This is a deliberate, narrowly-scoped delivery channel required for the membership flow to function for not-yet-registered invitees; it does not constitute the broader notification engine (per-user preferences, batching/throttling, inbox/alert center, SMS), which remains deferred. Invitations are also surfaced in-app on the Projects index for already-registered invitees.
 
 ### Trigger Events
 
@@ -448,7 +449,7 @@ Future versions may support project cloning, branching schedules, and alternativ
 
 **FR-11.** Users shall be able to attach files and comments to tasks.
 
-**FR-12.** The system shall dispatch domain events for assignment, watched-task, mention, and dependency-impact occurrences. User-facing notification delivery (email/in-app/SMS) is deferred to a future phase.
+**FR-12.** The system shall dispatch domain events for assignment, watched-task, mention, and dependency-impact occurrences. User-facing notification delivery (email/in-app/SMS) is deferred to a future phase, **except project invitation email, which is delivered as of Phase 3** (a tokenized accept link sent to invitees).
 
 **FR-13.** The system shall support a per-project baseline classification and per-field classification markings, preventing cross-program data contamination.
 
@@ -570,7 +571,7 @@ Core relational nodes:
 
 ## A6. Automated Conformity Enforcement
 
-- **\[ARCHITECTURE\]** Architectural invariants are enforced programmatically with Pest PHP architecture tests, run locally and in CI/CD, that break the build on structural drift. Enforced rules include: FormRequests live only in App\\Http\\Requests and are used only by controllers; request classes carry the Request suffix; and controllers may use only Requests, Services, Models, and Illuminate\\Http - never low-level database queries directly.
+- **\[ARCHITECTURE\]** Architectural invariants are enforced programmatically with Pest PHP architecture tests, run locally and in CI/CD, that break the build on structural drift. Enforced rules include: FormRequests live only in App\\Http\\Requests and are used only by controllers; request classes carry the Request suffix; and controllers may use only an explicit allowlist of layers (FormRequests, API Resources, Models, Mailables, `Illuminate\\Http`, the `DB`/`Mail` facades, `Inertia`, `AuthorizesRequests`, and the `redirect` helper). **\[PHASE 3 UPDATE\]** The original wording allowed a `Services` layer and forbade the DB facade; both are obsolete — there is no service layer (C5) and the DB-facade prohibition was removed.
 
 ## A7. Document Ingestion
 
@@ -596,6 +597,7 @@ Deferral rationale - notification engines hide significant structural complexity
 - Batching and throttling (avoiding 50 separate emails on a bulk project update).
 - Queue configuration, retries, and failed-delivery state handling.
 - **\[ARCHITECTURE\]** By separating the event (the historical fact that something happened) from the notification (delivery to a human), core workflows can ship now while delivery listeners are added later without touching dispatch sites.
+- **\[PHASE 3 UPDATE\]** The generic event-bus/listener foundation has not yet been built (no `TaskCreated`/`TaskUpdated` events exist until Phase 6). The one delivery channel live today — project invitation email — is dispatched directly (`Mail::to(...)->queue(...)` from the invitation controller). When the event foundation lands, this can move behind a listener without changing the invite call site. Note also that the **service-layer assumption in A10's first bullet is superseded** — see "Backend Coding Conventions" C5: there is no service layer; controllers orchestrate, and domain behavior lives on rich models.
 
 ## A11. Frontend Gantt State Machine
 
@@ -650,6 +652,16 @@ The following conventions are enforced project-wide (where practical, via the Pe
 ## C4. API Resource Classes for Frontend Payloads
 
 - **\[ARCHITECTURE\]** Laravel Eloquent API Resource classes transform models and collections into frontend-ready data structures before they are handed to Inertia. Raw Eloquent models are never serialized straight to the frontend; Resource classes define the explicit shape, field selection, and any computed/derived attributes (such as the day-grain end_date = start_date + duration_days) so the React layer receives a stable, predictable contract that pairs with the Wayfinder-generated TypeScript types.
+- **\[PHASE 3 UPDATE\]** `JsonResource::withoutWrapping()` is enabled globally (in `AppServiceProvider`) so Resources serialize without the top-level `data` envelope — props arrive as plain objects/arrays, which is what the Inertia/React contract expects. Resource collections passed as Inertia props are therefore plain arrays.
+
+## C5. No Service Layer — Skinny Controllers, Rich Models \[PHASE 3\]
+
+- **\[ARCHITECTURE\]** There is **no service-class layer**. An early Phase-3 draft introduced `App\Services\*` wrappers; they were removed because most were thin pass-throughs over Eloquent and the indirection obscured trivial operations. Responsibilities are placed where they naturally belong:
+  - **FormRequests** own authorization + validation, including cross-field/domain guards (e.g., the invite guards: cannot invite the owner, an existing member, or create a duplicate pending invitation) via `prepareForValidation()` and the `after()` validation hook.
+  - **Rich models** own domain behavior and multi-write/stateful transitions: e.g. `ProjectInvitation::accept()` (transactional pivot attach + status flip), `decline()`/`revoke()`, the `creating` hook that defaults token/status/expiry, and query scopes (`pending()`, `forEmail()`); `Project::updateMemberRole()` / `removeMember()` (with owner-protection guards).
+  - **Controllers** stay thin: resolve the request, call model/Eloquent methods, dispatch a Mailable where needed, and return an Inertia response or redirect.
+- **\[ARCHITECTURE\]** Controller arch-test allowlist (A6) was updated accordingly. Controllers may use: `App\Http\Requests`, `App\Http\Resources`, `App\Mail`, `App\Models`, `Illuminate\Http`, the `DB` and `Mail` facades, `AuthorizesRequests`, `Inertia`, and the `redirect` helper. The earlier "controllers must not touch the DB facade" rule was **removed** as too restrictive (it forced needless indirection); transactions and raw queries are permitted but, by the convention above, generally live on models.
+- **\[ARCHITECTURE\]** Controllers conform to the Laravel preset's resourceful-method rule: actions are limited to standard names (`index/create/store/show/edit/update/destroy`) or are **single-action invokable** controllers. Non-resourceful operations therefore get their own invokable controller (e.g., `RestoreProjectController`, `AcceptInvitationController`, `DeclineInvitationController`, `SidebarCollapsedController`, `SidebarWidthController`).
 
 # Build Roadmap
 
@@ -663,9 +675,11 @@ Scaffold the Laravel shell and configure Pest. Commit the architecture tests so 
 
 Stand up authentication and the project membership model with owner/admin/editor/viewer roles. Deliver middleware/policies that block requests for projects the user is not a member of. Delivered: headless Fortify auth, the Inertia + React + TypeScript + Tailwind v4 frontend toolchain, the `Project` model + `project_user` pivot, `ProjectPolicy`, `EnsureProjectMember` middleware, and unit/feature/browser tests. (The `Project` model and pivot — originally sketched for Phase 3 — landed here because RBAC depends on them.)
 
-### Phase 3 - Project Topologies & Workspace Switching — ⏳ NEXT
+### Phase 3 - Project Topologies, Workspace Shell & Membership — ✅ COMPLETED
 
-The `Project` model and `project_user` pivot already exist (Phase 2). This phase adds project CRUD (create / edit / archive) and the membership-management UI, then builds the React project-switcher so users move between workspaces while the client retains local view state. Reuse the existing `User::projects()` (all-accessible) relation, design-system primitives, and Wayfinder helpers; route write actions through FormRequests + a Service and shape Inertia payloads with API Resources.
+Delivered project CRUD (create / edit / archive / restore), the per-project Settings page (General / Members / Danger tabs), the membership-management UI, pending **email** invitations (token + accept / decline / revoke), and the application shell: a top nav (logo + global cross-project search placeholder with ⌘K affordance) and a **collapsible, drag-resizable left sidebar** (custom, no new dependency) containing the workspace switcher (with the user/account menu) and project-scoped navigation. The switcher shows the **3 most-recently-updated projects (always including the current one)**; the full list lives on the Projects index. Established the no-service-layer convention (C5), the design-system primitives, and `lucide-react` as the icon library. See "Implementation Status & Established Conventions (through Phase 3)".
+
+(Originally scoped as "route write actions through FormRequests + a Service"; the Service part was dropped — see C5.)
 
 ### Phase 4 - Document Ingestion Subsystem
 
@@ -675,9 +689,9 @@ Multi-MIME upload controllers bound to project context, with an abstract storage
 
 Deploy the polymorphic comment schema and hook threads onto Document first to prove the plumbing across the API boundary before wiring it to Tasks.
 
-### Phase 6 - Task Core Lifecycle & Temporal Service Plumbing
+### Phase 6 - Task Core Lifecycle & Temporal Logic Plumbing
 
-Build atomic CRUD for the 5-tier recursive Task structure. Route start_date and duration_days updates through Service classes; keep MVP logic simple (manual locking first) before layering in cascading propagation. Dispatch domain events (TaskCreated, TaskUpdated) on create/update and register simple immediate listeners for internal state and system logging.
+Build atomic CRUD for the 5-tier recursive Task structure. Per C5 (no service layer), `start_date`/`duration_days` logic lives on the `Task` model (domain methods + scopes) with controllers staying thin; keep MVP logic simple (manual locking first) before layering in cascading propagation. Dispatch domain events (TaskCreated, TaskUpdated) on create/update and register simple immediate listeners for internal state and system logging — this is where the generic event/listener foundation (deferred in Phase 3) gets built.
 
 ### Phase 7 - UI Design System & Gantt State Engine
 
@@ -721,7 +735,7 @@ This section records what has actually been built and the engineering convention
 
 ### HTTP / Routing
 
-- Inertia, not REST (C1). Controllers are plain classes (extend nothing, `Controller` suffix) and — per the arch tests — may use only `App\Http\Requests`, `App\Services`, `App\Models`, `Illuminate\Http`, `Inertia`, and the `AuthorizesRequests` trait; never the DB facade directly.
+- Inertia, not REST (C1). Controllers are plain classes (extend nothing, `Controller` suffix). _(This Phase-2 snapshot originally listed an `App\Services` layer and forbade the DB facade; that was **superseded in Phase 3** — see C5 and the "through Phase 3" status for the current controller allowlist.)_
 - Routes are split: `routes/web.php` (public/guest) and `routes/dashboard.php` (loaded behind the `web` + `auth` group via the `then` callback in `bootstrap/app.php`). Route model binding + Wayfinder helpers throughout.
 
 ## Frontend Conventions
@@ -734,13 +748,48 @@ This section records what has actually been built and the engineering convention
 ## Testing & Quality Gates
 
 - **Pest** suites: `Unit`, `Feature`, `Browser` (registered in `tests/Pest.php` + `phpunit.xml`); `LazilyRefreshDatabase`.
-- **Architecture tests** (`tests/Feature/Arch`) enforce: controller layer/suffix/no-raw-DB, FormRequest location + `Request` suffix + base class + `rules()`/`authorize()`, model invariants (Model base, `casts()`, SoftDeletes, HasUserStamps, factory, morph alias, datetime casts), and migration invariants (macros present, no `->timestamps()`).
+- **Architecture tests** (`tests/Feature/Arch`) enforce: controller layer (`toOnlyUse` allowlist) + suffix, FormRequest location + `Request` suffix + base class + `rules()`/`authorize()`, model invariants (Model base, `casts()`, SoftDeletes, HasUserStamps, factory, morph alias, datetime casts), and migration invariants (macros present, no `->timestamps()`). **\[PHASE 3 UPDATE\]** The "controllers must not use the DB facade" rule was removed; the controller allowlist now also permits `App\Http\Resources`, `App\Mail`, the `DB`/`Mail` facades, and the `redirect` helper (see C5). The `App\Services` namespace was removed from the allowlist (the service layer no longer exists).
 - **Browser tests** (Pest v4 + Playwright) cover the auth flows and a guest-page smoke pass (`assertNoSmoke`). Screenshots are git-ignored.
 - **Commands** — `composer lint` (Pint + Rector + tests), `php artisan test --compact`, `vendor/bin/pint --dirty`.
 
-## Phase 3 Starting Point
+# Implementation Status & Established Conventions (through Phase 3)
 
-`Project`, the `project_user` pivot, `ProjectPolicy`, `EnsureProjectMember`, and `ProjectController@show` already exist. Phase 3 should add project create / edit / archive (FormRequests + a Service + an API Resource for the Inertia payload), the members-management UI, and the React workspace switcher backed by `User::projects()` — reusing the design-system primitives and Wayfinder helpers above.
+This section records what Phase 3 added on top of the Phase 1–2 foundation, and the conventions now locked in. Phases 1–3 are complete and fully tested (124 tests passing at the close of Phase 3).
+
+## Backend (Phase 3)
+
+### Enums & constants
+- **`InvitationStatus`** (string-backed) — `Pending` / `Accepted` / `Declined` / `Revoked`; `label()`, `isPending()`. Expiry is evaluated against `expires_at`, not stored as a status.
+- **`Role`** gained `label()` (for resource/UI display).
+- **`ProjectInvitation::EXPIRY_DAYS = 14`** — single source for the invitation validity window (used by the model's `creating` hook).
+
+### Data model
+- **`project_invitations` table** — `project_id` (cascade), `inviter_id` (nullable FK → users, nullOnDelete), `email`, `role`, `token` (unique, 64-char), `status` (default pending), `expires_at` / `accepted_at` / `declined_at` / `revoked_at`, `accepted_by`, plus the `userStamps()` + `softDeletesWithUserStamps()` macros. Morph alias `project_invitation`.
+- **`ProjectInvitation` model (rich)** — relations `project()`, `inviter()`, `acceptedBy()`; predicates `isExpired()` / `isActionable()`; scopes `pending()` and `forEmail()`; transition methods `accept(User)` (transactional pivot attach + status flip, idempotent for existing members), `decline()`, `revoke()`; a `creating` hook that defaults `token`/`status`/`expires_at`.
+- **`Project` model** gained `invitations()` (hasMany), and membership-mutation methods `updateMemberRole(User, Role)` / `removeMember(User)` — both guard the singular owner (`abort 403`); owner remains authoritative via `owner_id`.
+
+### HTTP / routing
+- **Controllers (skinny, no services — C5):** `ProjectController` (`index/create/store/show/update/destroy`), plus invokable `ProjectSettingsController`, `RestoreProjectController`, `AcceptInvitationController`, `DeclineInvitationController`, `SidebarCollapsedController`, `SidebarWidthController`, and resourceful `ProjectMemberController` (`update/destroy`) and `ProjectInvitationController` (`store/destroy`).
+- **FormRequests:** `StoreProjectRequest`, `UpdateProjectRequest`, `StoreInvitationRequest` (with `prepareForValidation` lowercasing + `after()` domain guards), `UpdateProjectMemberRequest`, `UpdateSidebarCollapsedRequest`, `UpdateSidebarWidthRequest`. Several expose a typed `role()` accessor so controllers never import enums.
+- **API Resources:** `ProjectResource` (full workspace payload incl. a `can{}` ability block from `ProjectPolicy`), `ProjectSummaryResource` (switcher/list rows), `ProjectMemberResource`, `ProjectInvitationResource`. `JsonResource::withoutWrapping()` is global (C4).
+- **Routes** (`routes/dashboard.php`, behind `web`+`auth`): project CRUD; `projects.restore` (`withTrashed` binding); `projects.settings`; nested `projects.members.*` and `projects.invitations.*` (the revoke route uses `scopeBindings`); non-member-scoped `invitations.show` (bound by `{invitation:token}`), `invitations.accept`, `invitations.decline`; and `sidebar.collapsed` / `sidebar.width`.
+- **Mailable:** `ProjectInvitationMail` (queued, Markdown) with a tokenized accept link, dispatched from `ProjectInvitationController@store`.
+- **Shared Inertia props** (`HandleInertiaRequests`): `recentProjects` (the ≤3 most-recently-updated accessible projects by `projects.updated_at`, always including the current project resolved from the route), `sidebarWidth`, `sidebarCollapsed`, `flash.status`, `auth.user`. The full accessible-project list is a per-page prop on the Projects index, not shared.
+
+### Authorization
+- **`ProjectInvitationPolicy`** — `respondToInvitation` allows the invitee whose email matches (case-insensitive). The tokenized `invitations.show` link is the bearer secret for discovery; accept/decline are email-gated.
+- Project abilities unchanged from Phase 2 (`ProjectPolicy`): `create`/`view`/`update`/`manageMembers`/`updateSettings`/`delete`.
+
+## Frontend (Phase 3)
+- **App shell** — `layouts/app-layout` composes a full-width top nav (`components/shell/top-nav`: logo, always-visible global cross-project search **placeholder** with a ⌘K affordance) + a **collapsible, drag-resizable left sidebar** (`components/shell/resizable-sidebar`, custom — **no new dependency**, ⌘B toggle, width/collapsed persisted to the session via the sidebar routes) hosting the **project switcher** (`components/shell/project-switcher`, which also contains the account/logout menu) and project-scoped nav (`components/shell/sidebar-nav`, with disabled "coming soon" placeholders for Phase 4–7 features).
+- **Pages** (`resources/js/Pages`): `Projects/Index` (cards + status dots + pending-invitation panel + archived/restore), `Projects/Create`, `Projects/Settings` (General / Members / Danger tabs), `Invitations/Show` (token landing).
+- **Design-system primitives** (`components/ui/*`, kebab-case files, default exports; compound components use named exports): `button` (variants `primary`/`secondary`/`danger`/`ghost`, sizes `default`/`sm`/`icon`, plus `ButtonLink` + `buttonClasses`), `dropdown-menu`, `select`, `textarea`, `avatar`, `badge`, `modal`, `confirm-dialog`, `fieldset` + `FieldRow` (the bordered label/field grid), `page-header`, `sidebar-tooltip`, `keyboard-shortcut`. Helpers in `utils/` (`cn`, `focusRing`, `navLink`) and `ROLE_LABELS` in `@/types`.
+- **Icons:** `lucide-react` is the icon library (installed; do not add other icon packs).
+- **Types:** `@/types` mirrors the Resources (`Project`, `ProjectSummary`, `ProjectMember`, `ProjectInvitation`, `Role`, `ProjectStatus`, `SharedProps`). `tsc --noEmit` is part of the verification loop alongside `npm run build`.
+
+## Phase 4 Starting Point
+
+Project CRUD, membership, invitations, the app shell, the switcher, and the full design-system + arch conventions (C1–C5) are in place. Phase 4 (Document Ingestion) should follow C5 (skinny controllers / rich models / FormRequests / API Resources), register any new polymorphic models in the morph map, use the migration macros, and reuse the shell + `components/ui` primitives for any UI. Note: the generic domain-event/listener foundation is still **not** built (deferred to Phase 6); only invitation email is delivered today.
 
 # Architecture Issues - Resolved
 
