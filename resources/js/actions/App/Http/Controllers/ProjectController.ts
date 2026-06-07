@@ -1,7 +1,7 @@
 import { queryParams, type RouteQueryOptions, type RouteDefinition, applyUrlDefaults } from './../../../../wayfinder'
 /**
 * @see \App\Http\Controllers\ProjectController::index
-* @see app/Http/Controllers/ProjectController.php:33
+* @see app/Http/Controllers/ProjectController.php:27
 * @route '/projects'
 */
 export const index = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -16,7 +16,7 @@ index.definition = {
 
 /**
 * @see \App\Http\Controllers\ProjectController::index
-* @see app/Http/Controllers/ProjectController.php:33
+* @see app/Http/Controllers/ProjectController.php:27
 * @route '/projects'
 */
 index.url = (options?: RouteQueryOptions) => {
@@ -25,7 +25,7 @@ index.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\ProjectController::index
-* @see app/Http/Controllers/ProjectController.php:33
+* @see app/Http/Controllers/ProjectController.php:27
 * @route '/projects'
 */
 index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -35,7 +35,7 @@ index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 
 /**
 * @see \App\Http\Controllers\ProjectController::index
-* @see app/Http/Controllers/ProjectController.php:33
+* @see app/Http/Controllers/ProjectController.php:27
 * @route '/projects'
 */
 index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -45,7 +45,7 @@ index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
 /**
 * @see \App\Http\Controllers\ProjectController::create
-* @see app/Http/Controllers/ProjectController.php:52
+* @see app/Http/Controllers/ProjectController.php:49
 * @route '/projects/create'
 */
 export const create = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -60,7 +60,7 @@ create.definition = {
 
 /**
 * @see \App\Http\Controllers\ProjectController::create
-* @see app/Http/Controllers/ProjectController.php:52
+* @see app/Http/Controllers/ProjectController.php:49
 * @route '/projects/create'
 */
 create.url = (options?: RouteQueryOptions) => {
@@ -69,7 +69,7 @@ create.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\ProjectController::create
-* @see app/Http/Controllers/ProjectController.php:52
+* @see app/Http/Controllers/ProjectController.php:49
 * @route '/projects/create'
 */
 create.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -79,7 +79,7 @@ create.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 
 /**
 * @see \App\Http\Controllers\ProjectController::create
-* @see app/Http/Controllers/ProjectController.php:52
+* @see app/Http/Controllers/ProjectController.php:49
 * @route '/projects/create'
 */
 create.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -89,7 +89,7 @@ create.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
 /**
 * @see \App\Http\Controllers\ProjectController::store
-* @see app/Http/Controllers/ProjectController.php:62
+* @see app/Http/Controllers/ProjectController.php:59
 * @route '/projects'
 */
 export const store = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -104,7 +104,7 @@ store.definition = {
 
 /**
 * @see \App\Http\Controllers\ProjectController::store
-* @see app/Http/Controllers/ProjectController.php:62
+* @see app/Http/Controllers/ProjectController.php:59
 * @route '/projects'
 */
 store.url = (options?: RouteQueryOptions) => {
@@ -113,7 +113,7 @@ store.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\ProjectController::store
-* @see app/Http/Controllers/ProjectController.php:62
+* @see app/Http/Controllers/ProjectController.php:59
 * @route '/projects'
 */
 store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({

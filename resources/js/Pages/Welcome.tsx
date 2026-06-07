@@ -1,3 +1,4 @@
+import Logo from '@/components/shell/logo';
 import Button from '@/components/ui/button';
 import { dashboard, login, register } from '@/routes';
 import { type SharedProps } from '@/types';
@@ -10,8 +11,8 @@ export default function Welcome() {
         <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-gray-50 px-4 dark:bg-neutral-950">
             <Head title="Welcome" />
 
-            <div className="flex flex-col items-center gap-2 text-center">
-                <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">Gantt</h1>
+            <div className="flex flex-col items-center gap-3 text-center">
+                <Logo size="lg" />
                 <p className="max-w-md text-sm text-gray-500 dark:text-neutral-400">
                     Gantt is a project management tool that allows you to create and manage your projects and tasks on a powerful and flexible platform.
                 </p>

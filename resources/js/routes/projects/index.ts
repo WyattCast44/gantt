@@ -3,7 +3,7 @@ import members from './members'
 import invitations from './invitations'
 /**
 * @see \App\Http\Controllers\ProjectController::index
-* @see app/Http/Controllers/ProjectController.php:33
+* @see app/Http/Controllers/ProjectController.php:27
 * @route '/projects'
 */
 export const index = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -18,7 +18,7 @@ index.definition = {
 
 /**
 * @see \App\Http\Controllers\ProjectController::index
-* @see app/Http/Controllers/ProjectController.php:33
+* @see app/Http/Controllers/ProjectController.php:27
 * @route '/projects'
 */
 index.url = (options?: RouteQueryOptions) => {
@@ -27,7 +27,7 @@ index.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\ProjectController::index
-* @see app/Http/Controllers/ProjectController.php:33
+* @see app/Http/Controllers/ProjectController.php:27
 * @route '/projects'
 */
 index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -37,7 +37,7 @@ index.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 
 /**
 * @see \App\Http\Controllers\ProjectController::index
-* @see app/Http/Controllers/ProjectController.php:33
+* @see app/Http/Controllers/ProjectController.php:27
 * @route '/projects'
 */
 index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -47,7 +47,7 @@ index.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
 /**
 * @see \App\Http\Controllers\ProjectController::create
-* @see app/Http/Controllers/ProjectController.php:52
+* @see app/Http/Controllers/ProjectController.php:49
 * @route '/projects/create'
 */
 export const create = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -62,7 +62,7 @@ create.definition = {
 
 /**
 * @see \App\Http\Controllers\ProjectController::create
-* @see app/Http/Controllers/ProjectController.php:52
+* @see app/Http/Controllers/ProjectController.php:49
 * @route '/projects/create'
 */
 create.url = (options?: RouteQueryOptions) => {
@@ -71,7 +71,7 @@ create.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\ProjectController::create
-* @see app/Http/Controllers/ProjectController.php:52
+* @see app/Http/Controllers/ProjectController.php:49
 * @route '/projects/create'
 */
 create.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -81,7 +81,7 @@ create.get = (options?: RouteQueryOptions): RouteDefinition<'get'> => ({
 
 /**
 * @see \App\Http\Controllers\ProjectController::create
-* @see app/Http/Controllers/ProjectController.php:52
+* @see app/Http/Controllers/ProjectController.php:49
 * @route '/projects/create'
 */
 create.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -91,7 +91,7 @@ create.head = (options?: RouteQueryOptions): RouteDefinition<'head'> => ({
 
 /**
 * @see \App\Http\Controllers\ProjectController::store
-* @see app/Http/Controllers/ProjectController.php:62
+* @see app/Http/Controllers/ProjectController.php:59
 * @route '/projects'
 */
 export const store = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -106,7 +106,7 @@ store.definition = {
 
 /**
 * @see \App\Http\Controllers\ProjectController::store
-* @see app/Http/Controllers/ProjectController.php:62
+* @see app/Http/Controllers/ProjectController.php:59
 * @route '/projects'
 */
 store.url = (options?: RouteQueryOptions) => {
@@ -115,7 +115,7 @@ store.url = (options?: RouteQueryOptions) => {
 
 /**
 * @see \App\Http\Controllers\ProjectController::store
-* @see app/Http/Controllers/ProjectController.php:62
+* @see app/Http/Controllers/ProjectController.php:59
 * @route '/projects'
 */
 store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
@@ -125,7 +125,7 @@ store.post = (options?: RouteQueryOptions): RouteDefinition<'post'> => ({
 
 /**
 * @see \App\Http\Controllers\RestoreProjectController::__invoke
-* @see app/Http/Controllers/RestoreProjectController.php:21
+* @see app/Http/Controllers/RestoreProjectController.php:18
 * @route '/projects/{project}/restore'
 */
 export const restore = (args: { project: number | { id: number } } | [project: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'patch'> => ({
@@ -140,7 +140,7 @@ restore.definition = {
 
 /**
 * @see \App\Http\Controllers\RestoreProjectController::__invoke
-* @see app/Http/Controllers/RestoreProjectController.php:21
+* @see app/Http/Controllers/RestoreProjectController.php:18
 * @route '/projects/{project}/restore'
 */
 restore.url = (args: { project: number | { id: number } } | [project: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -173,7 +173,7 @@ restore.url = (args: { project: number | { id: number } } | [project: number | {
 
 /**
 * @see \App\Http\Controllers\RestoreProjectController::__invoke
-* @see app/Http/Controllers/RestoreProjectController.php:21
+* @see app/Http/Controllers/RestoreProjectController.php:18
 * @route '/projects/{project}/restore'
 */
 restore.patch = (args: { project: number | { id: number } } | [project: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'patch'> => ({

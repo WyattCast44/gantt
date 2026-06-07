@@ -1,5 +1,9 @@
+import Logo from '@/components/shell/logo';
 import Card from '@/components/ui/card';
-import { Head } from '@inertiajs/react';
+import { welcome } from '@/routes';
+import { focusRingNeutral } from '@/utils/focusRing';
+import { cn } from '@/utils/cn';
+import { Head, Link } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
 
 type AuthLayoutProps = PropsWithChildren<{
@@ -12,7 +16,13 @@ export default function AuthLayout({ title, description, children }: AuthLayoutP
         <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-50 px-4 dark:bg-neutral-950">
             <Head title={title} />
 
-            <div className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Gantt</div>
+            <Link
+                href={welcome.url()}
+                aria-label="Gantt — back to home"
+                className={cn('rounded-md', focusRingNeutral)}
+            >
+                <Logo size="lg" />
+            </Link>
 
             <div className="w-full max-w-md">
                 <Card>

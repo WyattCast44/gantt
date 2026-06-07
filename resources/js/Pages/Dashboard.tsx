@@ -18,8 +18,7 @@ export default function Dashboard() {
 
                 <Card>
                     <p className="text-sm text-gray-600 dark:text-neutral-400">
-                        Your projects will appear here. Project creation and the workspace switcher arrive in the
-                        next phase.
+                        Browse and create projects from the sidebar, or switch workspaces from the header.
                     </p>
                 </Card>
             </div>

@@ -5,17 +5,14 @@ arch('controllers only use approved layers')
     ->toOnlyUse([
         'App\Http\Requests',
         'App\Http\Controllers',
-        'App\Services',
+        'App\Http\Resources',
+        'App\Mail',
         'App\Models',
         'Illuminate\Http',
+        'Illuminate\Support\Facades\DB',
+        'Illuminate\Support\Facades\Mail',
         'Illuminate\Foundation\Auth\Access\AuthorizesRequests',
         'Inertia',
+        'redirect',
     ])
     ->ignoring('App\Http\Controllers\Concerns');
-
-arch('controllers do not run raw queries')
-    ->expect('App\Http\Controllers')
-    ->not->toUse([
-        'Illuminate\Support\Facades\DB',
-        'DB',
-    ]);

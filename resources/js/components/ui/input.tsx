@@ -7,8 +7,8 @@ interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'>
 }
 
 const sizeClasses = {
-    md: cn('rounded-md py-1.5 shadow-sm', focusRingInputMd),
-    lg: cn('rounded-lg py-2 shadow-sm', focusRingInputLg),
+    md: cn('rounded-md py-1.5', focusRingInputMd),
+    lg: cn('rounded-lg py-2', focusRingInputLg),
 };
 
 const Input = forwardRef<HTMLInputElement, InputProps>(function Input(

@@ -2,6 +2,13 @@ export type ThemePreference = 'light' | 'dark' | 'system';
 
 export type Role = 'owner' | 'admin' | 'editor' | 'viewer';
 
+export const ROLE_LABELS: Record<Role, string> = {
+    owner: 'Owner',
+    admin: 'Admin',
+    editor: 'Editor',
+    viewer: 'Viewer',
+};
+
 export type ProjectStatus = 'active' | 'completed';
 
 export interface User {
@@ -79,7 +86,8 @@ export interface SharedProps {
     flash: {
         status: string | null;
     };
-    projects: ProjectSummary[];
+    /** The few most-recently-updated projects (incl. the current one) for the switcher. */
+    recentProjects: ProjectSummary[];
     sidebarWidth: number;
     sidebarCollapsed: boolean;
     [key: string]: unknown;

@@ -67,7 +67,9 @@ test('an authenticated user can sign out through the browser', function () {
 
     $page = visit('/dashboard');
 
+    // Log out lives in the project switcher dropdown in the sidebar.
     $page->assertSee('Dashboard')
+        ->click($user->name)
         ->click('Log out')
         ->assertNoJavascriptErrors()
         ->assertSee('Sign In');
