@@ -13,8 +13,6 @@ export default function Create() {
     const form = useForm({
         name: '',
         description: '',
-        start_date: '',
-        end_date: '',
     });
 
     const submit = (event: FormEvent) => {
@@ -25,7 +23,7 @@ export default function Create() {
     return (
         <AppLayout title="New project">
             <form onSubmit={submit} className="mx-auto flex max-w-2xl flex-col gap-6">
-                <PageHeader title="New project" description="Create a workspace to plan an operational test campaign." />
+                <PageHeader title="New project" description="Create a workspace to organize tasks, documents, and your team." />
 
                 <Fieldset
                     footer={
@@ -58,26 +56,6 @@ export default function Create() {
                             placeholder="What is this campaign about?"
                         />
                         <InputError message={form.errors.description} className="mt-1" />
-                    </FieldRow>
-
-                    <FieldRow label="Start date" htmlFor="start_date">
-                        <Input
-                            id="start_date"
-                            type="date"
-                            value={form.data.start_date}
-                            onChange={(event) => form.setData('start_date', event.target.value)}
-                        />
-                        <InputError message={form.errors.start_date} className="mt-1" />
-                    </FieldRow>
-
-                    <FieldRow label="End date" htmlFor="end_date">
-                        <Input
-                            id="end_date"
-                            type="date"
-                            value={form.data.end_date}
-                            onChange={(event) => form.setData('end_date', event.target.value)}
-                        />
-                        <InputError message={form.errors.end_date} className="mt-1" />
                     </FieldRow>
                 </Fieldset>
             </form>

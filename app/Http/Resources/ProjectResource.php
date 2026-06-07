@@ -44,6 +44,7 @@ class ProjectResource extends JsonResource
                 'updateSettings' => $user->can('updateSettings', $this->resource),
                 'delete' => $user->can('delete', $this->resource),
             ],
+            'work_calendar' => $this->workCalendar()->toArray(),
         ];
     }
 }

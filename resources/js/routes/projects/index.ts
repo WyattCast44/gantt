@@ -185,7 +185,7 @@ restore.patch = (args: { project: number | { id: number } } | [project: number |
 
 /**
 * @see \App\Http\Controllers\ProjectController::show
-* @see app/Http/Controllers/ProjectController.php:73
+* @see app/Http/Controllers/ProjectController.php:74
 * @route '/projects/{project}'
 */
 export const show = (args: { project: number | { id: number } } | [project: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -200,7 +200,7 @@ show.definition = {
 
 /**
 * @see \App\Http\Controllers\ProjectController::show
-* @see app/Http/Controllers/ProjectController.php:73
+* @see app/Http/Controllers/ProjectController.php:74
 * @route '/projects/{project}'
 */
 show.url = (args: { project: number | { id: number } } | [project: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -233,7 +233,7 @@ show.url = (args: { project: number | { id: number } } | [project: number | { id
 
 /**
 * @see \App\Http\Controllers\ProjectController::show
-* @see app/Http/Controllers/ProjectController.php:73
+* @see app/Http/Controllers/ProjectController.php:74
 * @route '/projects/{project}'
 */
 show.get = (args: { project: number | { id: number } } | [project: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'get'> => ({
@@ -243,7 +243,7 @@ show.get = (args: { project: number | { id: number } } | [project: number | { id
 
 /**
 * @see \App\Http\Controllers\ProjectController::show
-* @see app/Http/Controllers/ProjectController.php:73
+* @see app/Http/Controllers/ProjectController.php:74
 * @route '/projects/{project}'
 */
 show.head = (args: { project: number | { id: number } } | [project: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'head'> => ({
@@ -321,7 +321,7 @@ settings.head = (args: { project: number | { id: number } } | [project: number |
 
 /**
 * @see \App\Http\Controllers\ProjectController::update
-* @see app/Http/Controllers/ProjectController.php:85
+* @see app/Http/Controllers/ProjectController.php:86
 * @route '/projects/{project}'
 */
 export const update = (args: { project: number | { id: number } } | [project: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'patch'> => ({
@@ -336,7 +336,7 @@ update.definition = {
 
 /**
 * @see \App\Http\Controllers\ProjectController::update
-* @see app/Http/Controllers/ProjectController.php:85
+* @see app/Http/Controllers/ProjectController.php:86
 * @route '/projects/{project}'
 */
 update.url = (args: { project: number | { id: number } } | [project: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -369,7 +369,7 @@ update.url = (args: { project: number | { id: number } } | [project: number | { 
 
 /**
 * @see \App\Http\Controllers\ProjectController::update
-* @see app/Http/Controllers/ProjectController.php:85
+* @see app/Http/Controllers/ProjectController.php:86
 * @route '/projects/{project}'
 */
 update.patch = (args: { project: number | { id: number } } | [project: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'patch'> => ({
@@ -379,7 +379,7 @@ update.patch = (args: { project: number | { id: number } } | [project: number | 
 
 /**
 * @see \App\Http\Controllers\ProjectController::archive
-* @see app/Http/Controllers/ProjectController.php:95
+* @see app/Http/Controllers/ProjectController.php:96
 * @route '/projects/{project}'
 */
 export const archive = (args: { project: number | { id: number } } | [project: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'delete'> => ({
@@ -394,7 +394,7 @@ archive.definition = {
 
 /**
 * @see \App\Http\Controllers\ProjectController::archive
-* @see app/Http/Controllers/ProjectController.php:95
+* @see app/Http/Controllers/ProjectController.php:96
 * @route '/projects/{project}'
 */
 archive.url = (args: { project: number | { id: number } } | [project: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions) => {
@@ -427,7 +427,7 @@ archive.url = (args: { project: number | { id: number } } | [project: number | {
 
 /**
 * @see \App\Http\Controllers\ProjectController::archive
-* @see app/Http/Controllers/ProjectController.php:95
+* @see app/Http/Controllers/ProjectController.php:96
 * @route '/projects/{project}'
 */
 archive.delete = (args: { project: number | { id: number } } | [project: number | { id: number } ] | number | { id: number }, options?: RouteQueryOptions): RouteDefinition<'delete'> => ({

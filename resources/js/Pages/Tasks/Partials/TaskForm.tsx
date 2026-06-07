@@ -1,4 +1,4 @@
-import Button from '@/components/ui/button';
+import Button, { ButtonLink } from '@/components/ui/button';
 import Fieldset, { FieldRow } from '@/components/ui/fieldset';
 import Input from '@/components/ui/input';
 import InputError from '@/components/ui/input-error';
@@ -15,8 +15,10 @@ import {
     type Task,
     type TaskStatusValue,
 } from '@/types';
+import { formatLongDateFromInput, todayInputDate } from '@/utils/date';
+import { DURATION_UNITS, resolveWorkCalendar, taskEndDate, type DurationUnitValue } from '@/utils/schedule';
 import { useForm } from '@inertiajs/react';
-import { type FormEvent } from 'react';
+import { type FormEvent, useMemo } from 'react';
 
 type TaskFormData = {
     name: string;
@@ -24,6 +26,7 @@ type TaskFormData = {
     parent_id: number | null;
     start_date: string;
     duration_days: number;
+    duration_unit: DurationUnitValue;
     is_date_locked: boolean;
     status: TaskStatusValue;
     risk_level: RiskLevelValue;
@@ -43,19 +46,22 @@ type TaskFormProps = {
     defaultParentId?: number | null;
     /** Classification options capped at the project baseline. */
     options: typeof CLASSIFICATIONS;
+    /** Link target for the cancel button (create page). */
+    cancelHref?: string;
     onSuccess?: () => void;
     onCancel?: () => void;
 };
 
-export default function TaskForm({ project, task, parents = [], defaultParentId = null, options, onSuccess, onCancel }: TaskFormProps) {
+export default function TaskForm({ project, task, parents = [], defaultParentId = null, options, cancelHref, onSuccess, onCancel }: TaskFormProps) {
     const editing = task !== undefined;
 
     const form = useForm<TaskFormData>({
         name: task?.name ?? '',
         description: task?.description ?? '',
         parent_id: defaultParentId,
-        start_date: task?.start_date ?? '',
+        start_date: task ? (task.start_date ?? '') : todayInputDate(),
         duration_days: task?.duration_days ?? 1,
+        duration_unit: task?.duration_unit.value ?? 'work_days',
         is_date_locked: task?.is_date_locked ?? true,
         status: task?.status.value ?? 'not_started',
         risk_level: task?.risk_level.value ?? 'low',
@@ -64,6 +70,18 @@ export default function TaskForm({ project, task, parents = [], defaultParentId 
         tags: (task?.tags ?? []).join(', '),
         base_classification: task?.base_classification.value ?? options[0].value,
     });
+
+    const workCalendar = useMemo(() => resolveWorkCalendar(project), [project]);
+
+    const calculatedEndDate = useMemo(
+        () => taskEndDate(form.data.start_date, form.data.duration_days, form.data.duration_unit, workCalendar),
+        [form.data.start_date, form.data.duration_days, form.data.duration_unit, workCalendar],
+    );
+
+    const formattedEndDate = useMemo(
+        () => (calculatedEndDate ? formatLongDateFromInput(calculatedEndDate) : null),
+        [calculatedEndDate],
+    );
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -80,9 +98,9 @@ export default function TaskForm({ project, task, parents = [], defaultParentId 
         }));
 
         if (editing) {
-            form.patch(taskUpdate.url([project.id, task.id]), { preserveScroll: true, onSuccess });
+            form.patch(taskUpdate.url([project.id, task.id]), { onSuccess });
         } else {
-            form.post(taskStore.url(project.id), { preserveScroll: true, onSuccess });
+            form.post(taskStore.url(project.id), { onSuccess });
         }
     };
 
@@ -91,10 +109,16 @@ export default function TaskForm({ project, task, parents = [], defaultParentId 
             <Fieldset
                 footer={
                     <>
-                        {onCancel && (
-                            <Button variant="secondary" onClick={onCancel} disabled={form.processing}>
+                        {cancelHref ? (
+                            <ButtonLink href={cancelHref} variant="secondary">
                                 Cancel
-                            </Button>
+                            </ButtonLink>
+                        ) : (
+                            onCancel && (
+                                <Button variant="secondary" onClick={onCancel} disabled={form.processing}>
+                                    Cancel
+                                </Button>
+                            )
                         )}
                         <Button type="submit" disabled={form.processing}>
                             {editing ? 'Save changes' : 'Create task'}
@@ -145,16 +169,50 @@ export default function TaskForm({ project, task, parents = [], defaultParentId 
                     <InputError message={form.errors.start_date} className="mt-1" />
                 </FieldRow>
 
-                <FieldRow label="Duration (days)" htmlFor="task-duration" required>
+                <FieldRow label="Duration" htmlFor="task-duration" required>
+                    <div className="grid grid-cols-[minmax(5rem,1fr)_auto]">
+                        <Input
+                            id="task-duration"
+                            type="number"
+                            min={1}
+                            value={form.data.duration_days}
+                            onChange={(event) => form.setData('duration_days', Number(event.target.value))}
+                            required
+                            className="rounded-r-none border-r-0"
+                        />
+                        <Select
+                            id="task-duration-unit"
+                            value={form.data.duration_unit}
+                            onChange={(event) => form.setData('duration_unit', event.target.value as DurationUnitValue)}
+                            aria-label="Duration unit"
+                            className="w-[9.75rem] rounded-l-none"
+                        >
+                            {DURATION_UNITS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </Select>
+                    </div>
+                    <InputError message={form.errors.duration_days ?? form.errors.duration_unit} className="mt-1" />
+                </FieldRow>
+
+                <FieldRow label="End date" htmlFor="task-end">
                     <Input
-                        id="task-duration"
-                        type="number"
-                        min={1}
-                        value={form.data.duration_days}
-                        onChange={(event) => form.setData('duration_days', Number(event.target.value))}
-                        required
+                        id="task-end"
+                        type="text"
+                        disabled
+                        readOnly
+                        value={formattedEndDate ?? ''}
+                        placeholder="—"
+                        className="cursor-not-allowed opacity-60"
+                        aria-describedby={formattedEndDate ? undefined : 'task-end-help'}
                     />
-                    <InputError message={form.errors.duration_days} className="mt-1" />
+                    {!formattedEndDate && (
+                        <p id="task-end-help" className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
+                            Set a start date to calculate the end date.
+                        </p>
+                    )}
                 </FieldRow>
 
                 <FieldRow label="Date lock" htmlFor="task-lock">

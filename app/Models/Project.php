@@ -9,6 +9,7 @@ use App\Enums\Role;
 use App\Models\Concerns\HasClassification;
 use App\Models\Concerns\HasUserStamps;
 use App\Models\Concerns\LogsModelActivity;
+use App\Support\WorkCalendar;
 use Database\Factories\ProjectFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -39,6 +40,15 @@ class Project extends Model
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
         ];
+    }
+
+    /**
+     * The project's working-time calendar (non-working weekdays, future holidays).
+     * Defaults until calendar settings are persisted on the project.
+     */
+    public function workCalendar(): WorkCalendar
+    {
+        return WorkCalendar::default();
     }
 
     /**

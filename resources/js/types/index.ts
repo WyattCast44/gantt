@@ -11,6 +11,13 @@ export const ROLE_LABELS: Record<Role, string> = {
 
 export type ProjectStatus = 'active' | 'completed';
 
+export type DurationUnitValue = 'calendar_days' | 'work_days';
+
+/** JavaScript weekday index: 0 = Sunday … 6 = Saturday. */
+export interface WorkCalendar {
+    non_working_weekdays: number[];
+}
+
 export type BaseClassificationValue = 'unclassified' | 'cui' | 'confidential' | 'secret' | 'top_secret';
 
 /** Classification markings ordered from least to most restrictive. */
@@ -67,6 +74,8 @@ export interface Project {
     is_archived: boolean;
     viewer_role: Role | null;
     can: ProjectAbilities;
+    /** Non-working weekdays for schedule math; future source is project settings. */
+    work_calendar: WorkCalendar;
 }
 
 /** A project member (ProjectMemberResource). */
@@ -149,16 +158,27 @@ export interface Dependency {
     name: string;
 }
 
+/** A parent or child task summary shown on the detail view. */
+export interface TaskSummary {
+    id: number;
+    name: string;
+    status: Labeled<TaskStatusValue>;
+    percent_complete: number;
+}
+
 /** A project task (TaskResource). Recursive via `children`. */
 export interface Task {
     id: number;
     name: string;
     description: string | null;
     parent_id: number | null;
+    /** Parent task summary (detail view only). */
+    parent?: TaskSummary | null;
     hierarchy_level: number;
     sort_order: number;
     start_date: string | null;
     duration_days: number;
+    duration_unit: Labeled<DurationUnitValue>;
     /** Derived (start + duration, day-grain); null when unscheduled. */
     end_date: string | null;
     is_date_locked: boolean;
@@ -173,6 +193,8 @@ export interface Task {
     updated_at: string | null;
     /** Direct children (present on the index tree and the detail subtree). */
     children: Task[];
+    /** Whether any descendant is not complete (detail view only). */
+    has_incomplete_descendants?: boolean;
     /** Predecessor tasks this task depends on (detail view only). */
     predecessors?: Dependency[];
     /** Successor tasks that depend on this one (detail view only). */

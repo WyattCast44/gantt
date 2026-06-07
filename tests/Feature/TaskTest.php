@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\BaseClassification;
+use App\Enums\DurationUnit;
 use App\Enums\RiskLevel;
 use App\Enums\Role;
 use App\Enums\TaskStatus;
@@ -27,6 +28,7 @@ function taskPayload(array $overrides = []): array
         'description' => 'Calibrate the electro-optical sensor.',
         'start_date' => '2026-01-01',
         'duration_days' => 5,
+        'duration_unit' => DurationUnit::WorkDays->value,
         'is_date_locked' => true,
         'status' => TaskStatus::NotStarted->value,
         'percent_complete' => 0,
@@ -42,7 +44,7 @@ test('an editor can create a top-level task', function () {
     $project = Project::factory()->withMember($editor, Role::Editor)->create();
 
     $this->actingAs($editor)->post(route('projects.tasks.store', $project), taskPayload())
-        ->assertRedirect();
+        ->assertRedirect(route('projects.tasks.show', [$project, $project->tasks()->first()]));
 
     $task = $project->tasks()->firstOrFail();
 
@@ -51,6 +53,17 @@ test('an editor can create a top-level task', function () {
         ->and($task->parent_id)->toBeNull()
         ->and($task->is_date_locked)->toBeTrue()
         ->and($task->created_by)->toBe($editor->id);
+});
+
+test('creating a task without a start date defaults to today', function () {
+    $editor = User::factory()->create();
+    $project = Project::factory()->withMember($editor, Role::Editor)->create();
+
+    $this->actingAs($editor)->post(route('projects.tasks.store', $project), taskPayload([
+        'start_date' => null,
+    ]))->assertRedirect();
+
+    expect($project->tasks()->firstOrFail()->start_date?->toDateString())->toBe(today()->toDateString());
 });
 
 test('a child task inherits its hierarchy level from the parent', function () {
@@ -90,6 +103,57 @@ test('a task cannot be classified above the project baseline', function () {
     ]))->assertInvalid('base_classification');
 
     expect($project->tasks()->count())->toBe(0);
+});
+
+test('an editor can view the task create form', function () {
+    $editor = User::factory()->create();
+    $project = Project::factory()->withMember($editor, Role::Editor)->create();
+
+    $this->actingAs($editor)->get(route('projects.tasks.create', $project))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Tasks/Create', false)
+            ->has('project')
+            ->has('parents')
+            ->where('defaultParentId', null)
+        );
+});
+
+test('the create form preselects a valid parent from the query string', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $parent = Task::factory()->forProject($project)->create();
+
+    $this->actingAs($owner)->get(route('projects.tasks.create', [
+        'project' => $project,
+        'parent_id' => $parent->id,
+    ]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Tasks/Create', false)
+            ->where('defaultParentId', $parent->id)
+        );
+});
+
+test('a viewer cannot view the task create form', function () {
+    $viewer = User::factory()->create();
+    $project = Project::factory()->withMember($viewer, Role::Viewer)->create();
+
+    $this->actingAs($viewer)->get(route('projects.tasks.create', $project))
+        ->assertForbidden();
+});
+
+test('the show page renders the edit tab', function () {
+    $editor = User::factory()->create();
+    $project = Project::factory()->withMember($editor, Role::Editor)->create();
+    $task = Task::factory()->forProject($project)->create();
+
+    $this->actingAs($editor)->get(route('projects.tasks.show', [$project, $task, 'tab' => 'edit']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Tasks/Show', false)
+            ->where('task.id', $task->id)
+        );
 });
 
 test('a viewer cannot create a task', function () {
@@ -142,16 +206,44 @@ test('deleting a task soft-deletes its whole subtree', function () {
         ->and(Task::withTrashed()->find($grandchild->id)->trashed())->toBeTrue();
 });
 
-test('the derived end date is start plus duration at day grain', function () {
-    $task = Task::factory()->create(['start_date' => '2026-03-01', 'duration_days' => 5]);
+test('the derived end date is start plus duration at calendar-day grain', function () {
+    $task = Task::factory()->create([
+        'start_date' => '2026-03-01',
+        'duration_days' => 5,
+        'duration_unit' => DurationUnit::CalendarDays,
+    ]);
 
     expect($task->endDate()?->toDateString())->toBe('2026-03-05');
 });
 
-test('a one-day task ends on its start date', function () {
-    $task = Task::factory()->create(['start_date' => '2026-03-01', 'duration_days' => 1]);
+test('the derived end date counts work days on the project calendar', function () {
+    $task = Task::factory()->create([
+        'start_date' => '2026-03-02',
+        'duration_days' => 5,
+        'duration_unit' => DurationUnit::WorkDays,
+    ]);
+
+    expect($task->endDate()?->toDateString())->toBe('2026-03-06');
+});
+
+test('a one-day calendar task ends on its start date', function () {
+    $task = Task::factory()->create([
+        'start_date' => '2026-03-01',
+        'duration_days' => 1,
+        'duration_unit' => DurationUnit::CalendarDays,
+    ]);
 
     expect($task->endDate()?->toDateString())->toBe('2026-03-01');
+});
+
+test('a one-day work task starting on a weekend ends on the next work day', function () {
+    $task = Task::factory()->create([
+        'start_date' => '2026-03-01',
+        'duration_days' => 1,
+        'duration_unit' => DurationUnit::WorkDays,
+    ]);
+
+    expect($task->endDate()?->toDateString())->toBe('2026-03-02');
 });
 
 test('the index renders the project task tree', function () {
@@ -182,6 +274,38 @@ test('the show payload includes direct child tasks', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->has('task.children', 1)
             ->where('task.children.0.name', 'Calibrate sensor')
+            ->where('task.has_incomplete_descendants', true)
+        );
+});
+
+test('the show payload reports no incomplete descendants when the subtree is complete', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $parent = Task::factory()->forProject($project)->create(['status' => TaskStatus::Complete]);
+    Task::factory()->forProject($project)->child($parent)->create([
+        'name' => 'Calibrate sensor',
+        'status' => TaskStatus::Complete,
+    ]);
+
+    $this->actingAs($owner)->get(route('projects.tasks.show', [$project, $parent]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('task.has_incomplete_descendants', false)
+        );
+});
+
+test('the show payload includes the parent task when present', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $parent = Task::factory()->forProject($project)->create(['name' => 'Aircraft']);
+    $child = Task::factory()->forProject($project)->child($parent)->create(['name' => 'Sensor Integration']);
+
+    $this->actingAs($owner)->get(route('projects.tasks.show', [$project, $child]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('task.parent_id', $parent->id)
+            ->where('task.parent.id', $parent->id)
+            ->where('task.parent.name', 'Aircraft')
         );
 });
 
@@ -191,6 +315,7 @@ test('the show payload includes the derived end date and metadata', function () 
     $task = Task::factory()->forProject($project)->create([
         'start_date' => '2026-01-01',
         'duration_days' => 10,
+        'duration_unit' => DurationUnit::CalendarDays,
     ]);
 
     $this->actingAs($owner)->get(route('projects.tasks.show', [$project, $task]))
@@ -199,6 +324,7 @@ test('the show payload includes the derived end date and metadata', function () 
             ->component('Tasks/Show', false)
             ->where('task.end_date', '2026-01-10')
             ->where('task.duration_days', 10)
+            ->where('task.duration_unit.value', 'calendar_days')
             ->has('availableTasks')
         );
 });

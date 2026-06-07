@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use App\Enums\BaseClassification;
+use App\Enums\DurationUnit;
 use App\Enums\RiskLevel;
 use App\Enums\TaskStatus;
 use App\Models\Project;
@@ -34,6 +35,7 @@ class StoreTaskRequest extends FormRequest
             'parent_id' => ['nullable', 'integer', 'exists:tasks,id'],
             'start_date' => ['nullable', 'date'],
             'duration_days' => ['required', 'integer', 'min:1', 'max:3650'],
+            'duration_unit' => ['required', Rule::enum(DurationUnit::class)],
             'is_date_locked' => ['boolean'],
             'status' => ['required', Rule::enum(TaskStatus::class)],
             'percent_complete' => ['required', 'integer', 'between:0,100'],

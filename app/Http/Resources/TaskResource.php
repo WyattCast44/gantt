@@ -29,10 +29,23 @@ class TaskResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'parent_id' => $this->parent_id,
+            'parent' => $this->whenLoaded('parent', fn () => $this->parent === null ? null : [
+                'id' => $this->parent->id,
+                'name' => $this->parent->name,
+                'status' => [
+                    'value' => $this->parent->status->value,
+                    'label' => $this->parent->status->label(),
+                ],
+                'percent_complete' => $this->parent->percent_complete,
+            ]),
             'hierarchy_level' => $this->hierarchy_level,
             'sort_order' => $this->sort_order,
             'start_date' => $this->start_date?->toDateString(),
             'duration_days' => $this->duration_days,
+            'duration_unit' => [
+                'value' => $this->duration_unit->value,
+                'label' => $this->duration_unit->label(),
+            ],
             'end_date' => $this->endDate()?->toDateString(),
             'is_date_locked' => $this->is_date_locked,
             'status' => [
@@ -54,6 +67,10 @@ class TaskResource extends JsonResource
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
             'children' => TaskResource::collection($this->whenLoaded('children')),
+            'has_incomplete_descendants' => $this->when(
+                $this->relationLoaded('children'),
+                fn () => $this->hasIncompleteDescendants(),
+            ),
             'predecessors' => DependencyResource::collection($this->whenLoaded('predecessors')),
             'successors' => DependencyResource::collection($this->whenLoaded('successors')),
             'documents' => DocumentResource::collection($this->whenLoaded('documents')),

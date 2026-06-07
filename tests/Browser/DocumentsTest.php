@@ -32,6 +32,18 @@ test('the empty state renders when a project has no documents', function () {
         ->assertNoJavascriptErrors();
 });
 
+test('the document edit tab renders without javascript errors', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $document = Document::factory()->forProject($project)->create(['name' => 'Operations plan']);
+    actingAs($owner);
+
+    visit("/projects/{$project->id}/documents/{$document->id}?tab=edit")
+        ->assertSee('Edit')
+        ->assertSee('Save changes')
+        ->assertNoJavascriptErrors();
+});
+
 test('the document show page renders without javascript errors', function () {
     $owner = User::factory()->create();
     $project = Project::factory()->withOwner($owner)->create();

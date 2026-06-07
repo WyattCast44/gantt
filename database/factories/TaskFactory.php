@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Enums\BaseClassification;
+use App\Enums\DurationUnit;
 use App\Enums\RiskLevel;
 use App\Enums\TaskStatus;
 use App\Models\Project;
@@ -30,6 +31,7 @@ class TaskFactory extends Factory
             'description' => fake()->optional()->paragraph(),
             'start_date' => fake()->optional()->dateTimeBetween('-1 month', '+1 month'),
             'duration_days' => fake()->numberBetween(1, 30),
+            'duration_unit' => DurationUnit::WorkDays,
             'is_date_locked' => true,
             'hierarchy_level' => 1,
             'sort_order' => 0,

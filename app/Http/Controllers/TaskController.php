@@ -18,6 +18,7 @@ use App\Models\Project;
 use App\Models\Task;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -50,6 +51,32 @@ class TaskController
     }
 
     /**
+     * Show the create-task form.
+     */
+    public function create(Request $request, Project $project): Response
+    {
+        $this->authorize('update', $project);
+
+        $defaultParentId = null;
+
+        if ($request->filled('parent_id')) {
+            $parent = $project->tasks()->find($request->integer('parent_id'));
+
+            if ($parent?->canHaveChildren()) {
+                $defaultParentId = $parent->id;
+            }
+        }
+
+        return Inertia::render('Tasks/Create', [
+            'project' => new ProjectResource($project),
+            'parents' => TaskResource::collection(
+                $project->tasks()->where('hierarchy_level', '<', Task::MAX_DEPTH)->orderBy('name')->get()
+            ),
+            'defaultParentId' => $defaultParentId,
+        ]);
+    }
+
+    /**
      * Show a single task with its subtree, comments, and audit trail.
      */
     public function show(Project $project, Task $task): Response
@@ -60,6 +87,7 @@ class TaskController
 
         $task->load([
             'creator',
+            'parent',
             'children' => fn ($query) => $query->with('creator'),
             'predecessors',
             'successors',
@@ -96,7 +124,13 @@ class TaskController
     {
         $parent = $request->parentTask();
 
-        $task = new Task($request->safe()->except('parent_id'));
+        $attributes = $request->safe()->except('parent_id');
+
+        if (($attributes['start_date'] ?? null) === null) {
+            $attributes['start_date'] = today();
+        }
+
+        $task = new Task($attributes);
 
         // Structural fields are derived server-side; they are not #[Fillable].
         $task->project_id = $project->id;
@@ -108,7 +142,8 @@ class TaskController
 
         TaskCreated::dispatch($task);
 
-        return redirect()->back()->with('status', 'Task created.');
+        return redirect()->route('projects.tasks.show', [$project, $task])
+            ->with('status', 'Task created.');
     }
 
     /**
@@ -120,7 +155,8 @@ class TaskController
 
         TaskUpdated::dispatch($task);
 
-        return redirect()->back()->with('status', 'Task updated.');
+        return redirect()->route('projects.tasks.show', [$project, $task])
+            ->with('status', 'Task updated.');
     }
 
     /**

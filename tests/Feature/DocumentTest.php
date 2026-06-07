@@ -199,6 +199,19 @@ test('an editor can delete a document and its file', function () {
     Storage::disk('documents')->assertMissing($path);
 });
 
+test('the show page renders the edit tab', function () {
+    $user = User::factory()->create();
+    $project = Project::factory()->withOwner($user)->create();
+    $document = Document::factory()->forProject($project)->create();
+
+    $this->actingAs($user)->get(route('projects.documents.show', [$project, $document, 'tab' => 'edit']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Documents/Show', false)
+            ->where('document.id', $document->id)
+        );
+});
+
 test('the show page renders the document for a member', function () {
     $user = User::factory()->create();
     $project = Project::factory()->withOwner($user)->create();

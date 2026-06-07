@@ -140,6 +140,10 @@ Route::get('/projects/{project}/tasks', [TaskController::class, 'index'])
     ->middleware('project.member')
     ->name('projects.tasks.index');
 
+Route::get('/projects/{project}/tasks/create', [TaskController::class, 'create'])
+    ->middleware('project.member')
+    ->name('projects.tasks.create');
+
 Route::post('/projects/{project}/tasks', [TaskController::class, 'store'])
     ->middleware('project.member')
     ->name('projects.tasks.store');

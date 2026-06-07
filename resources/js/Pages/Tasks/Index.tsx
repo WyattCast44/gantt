@@ -1,38 +1,24 @@
 import Badge from '@/components/ui/badge';
-import Button from '@/components/ui/button';
+import Button, { ButtonLink } from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
-import Modal from '@/components/ui/modal';
 import PageHeader from '@/components/ui/page-header';
 import { Tooltip } from '@/components/ui/tooltip';
-import TaskForm from '@/Pages/Tasks/Partials/TaskForm';
-import { flattenTasks, countIncompleteSubtasks, hasIncompleteSubtasks, riskTone, riskTooltip, statusTone, statusTooltip } from '@/Pages/Tasks/Partials/badges';
+import { countIncompleteSubtasks, hasIncompleteSubtasks, riskTone, riskTooltip, statusTone, statusTooltip } from '@/Pages/Tasks/Partials/badges';
 import AppLayout from '@/layouts/app-layout';
-import { complete as taskComplete, destroy as taskDestroy, show as taskShow } from '@/routes/projects/tasks';
-import { type BaseClassificationValue, type Project, type Task } from '@/types';
-import { allowedClassifications } from '@/utils/classification';
+import { complete as taskComplete, create as tasksCreate, destroy as taskDestroy, show as taskShow } from '@/routes/projects/tasks';
+import { type Project, type Task } from '@/types';
 import { router, useForm } from '@inertiajs/react';
 import { CheckCircle2, ChevronDown, ChevronRight, ListTree, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
 /** Tasks deeper than this may not take children (PRD V1 cap of five tiers). */
 const MAX_DEPTH = 5;
 
 export default function Index({ project, tasks }: { project: Project; tasks: Task[] }) {
-    const [creating, setCreating] = useState(false);
-    const [createParentId, setCreateParentId] = useState<number | null>(null);
-    const [editing, setEditing] = useState<Task | null>(null);
     const [deleting, setDeleting] = useState<Task | null>(null);
     const [completing, setCompleting] = useState<Task | null>(null);
     const [expanded, setExpanded] = useState<Set<number>>(new Set());
-
-    const options = useMemo(
-        () => allowedClassifications(project.base_classification.value as BaseClassificationValue),
-        [project.base_classification.value],
-    );
-
-    // Candidate parents are any task still below the depth cap.
-    const parentCandidates = useMemo(() => flattenTasks(tasks).filter((task) => task.hierarchy_level < MAX_DEPTH), [tasks]);
 
     const deleteForm = useForm({});
     const completeForm = useForm<{ include_subtasks: boolean }>({ include_subtasks: false });
@@ -45,8 +31,11 @@ export default function Index({ project, tasks }: { project: Project; tasks: Tas
         });
 
     const openCreate = (parentId: number | null) => {
-        setCreateParentId(parentId);
-        setCreating(true);
+        router.visit(
+            tasksCreate.url(project.id, {
+                query: parentId === null ? undefined : { parent_id: parentId },
+            }),
+        );
     };
 
     const confirmDelete = () => {
@@ -93,10 +82,10 @@ export default function Index({ project, tasks }: { project: Project; tasks: Tas
                     description="Plan the work breakdown — nest subtasks up to five levels deep."
                     actions={
                         project.can.update && (
-                            <Button onClick={() => openCreate(null)}>
+                            <ButtonLink href={tasksCreate.url(project.id)}>
                                 <Plus className="mr-2 h-4 w-4" aria-hidden />
                                 New task
-                            </Button>
+                            </ButtonLink>
                         )
                     }
                 />
@@ -118,7 +107,6 @@ export default function Index({ project, tasks }: { project: Project; tasks: Tas
                                     expanded={expanded}
                                     onToggle={toggle}
                                     onAddChild={openCreate}
-                                    onEdit={setEditing}
                                     onDelete={setDeleting}
                                     onComplete={requestComplete}
                                 />
@@ -127,35 +115,6 @@ export default function Index({ project, tasks }: { project: Project; tasks: Tas
                     </Card>
                 )}
             </div>
-
-            {creating && (
-                <Modal open onClose={() => setCreating(false)} title="New task">
-                    <div className="mt-2">
-                        <TaskForm
-                            project={project}
-                            parents={parentCandidates}
-                            defaultParentId={createParentId}
-                            options={options}
-                            onSuccess={() => setCreating(false)}
-                            onCancel={() => setCreating(false)}
-                        />
-                    </div>
-                </Modal>
-            )}
-
-            {editing && (
-                <Modal open onClose={() => setEditing(null)} title="Edit task">
-                    <div className="mt-2">
-                        <TaskForm
-                            project={project}
-                            task={editing}
-                            options={options}
-                            onSuccess={() => setEditing(null)}
-                            onCancel={() => setEditing(null)}
-                        />
-                    </div>
-                </Modal>
-            )}
 
             <ConfirmDialog
                 open={deleting !== null}
@@ -192,12 +151,11 @@ type TaskRowProps = {
     expanded: Set<number>;
     onToggle: (id: number) => void;
     onAddChild: (parentId: number) => void;
-    onEdit: (task: Task) => void;
     onDelete: (task: Task) => void;
     onComplete: (task: Task) => void;
 };
 
-function TaskRow({ project, task, depth, expanded, onToggle, onAddChild, onEdit, onDelete, onComplete }: TaskRowProps) {
+function TaskRow({ project, task, depth, expanded, onToggle, onAddChild, onDelete, onComplete }: TaskRowProps) {
     const children = task.children ?? [];
     const hasChildren = children.length > 0;
     const isOpen = expanded.has(task.id);
@@ -264,9 +222,14 @@ function TaskRow({ project, task, depth, expanded, onToggle, onAddChild, onEdit,
                             </Tooltip>
                         )}
                         <Tooltip label="Edit task">
-                            <Button variant="ghost" size="icon" aria-label="Edit task" onClick={() => onEdit(task)}>
+                            <ButtonLink
+                                href={taskShow.url([project.id, task.id], { query: { tab: 'edit' } })}
+                                variant="ghost"
+                                size="icon"
+                                aria-label="Edit task"
+                            >
                                 <Pencil className="h-4 w-4" aria-hidden />
-                            </Button>
+                            </ButtonLink>
                         </Tooltip>
                         <Tooltip label="Delete task">
                             <Button variant="ghost" size="icon" aria-label="Delete task" onClick={() => onDelete(task)}>
@@ -288,7 +251,6 @@ function TaskRow({ project, task, depth, expanded, onToggle, onAddChild, onEdit,
                             expanded={expanded}
                             onToggle={onToggle}
                             onAddChild={onAddChild}
-                            onEdit={onEdit}
                             onDelete={onDelete}
                             onComplete={onComplete}
                         />

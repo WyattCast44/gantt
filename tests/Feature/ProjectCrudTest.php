@@ -57,7 +57,8 @@ test('a user can create a project and becomes its owner', function () {
 
     expect($project->owner_id)->toBe($user->id)
         ->and($project->status)->toBe(ProjectStatus::Active)
-        ->and($project->roleFor($user))->toBe(Role::Owner);
+        ->and($project->roleFor($user))->toBe(Role::Owner)
+        ->and($project->start_date?->toDateString())->toBe(today()->toDateString());
 });
 
 test('creating a project requires a name', function () {

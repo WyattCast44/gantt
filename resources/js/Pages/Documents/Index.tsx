@@ -1,11 +1,10 @@
 import Badge from '@/components/ui/badge';
 import Avatar from '@/components/ui/avatar';
-import Button, { buttonClasses } from '@/components/ui/button';
+import Button, { ButtonLink, buttonClasses } from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 import PageHeader from '@/components/ui/page-header';
 import { Tooltip } from '@/components/ui/tooltip';
-import EditDocumentModal from '@/Pages/Documents/Partials/EditDocumentModal';
 import { classificationTooltip, type DocumentTypeValue, typeTooltip } from '@/Pages/Documents/Partials/badges';
 import UploadDocumentModal from '@/Pages/Documents/Partials/UploadDocumentModal';
 import AppLayout from '@/layouts/app-layout';
@@ -19,7 +18,6 @@ import { useMemo, useState } from 'react';
 
 export default function Index({ project, documents }: { project: Project; documents: Document[] }) {
     const [uploadOpen, setUploadOpen] = useState(false);
-    const [editing, setEditing] = useState<Document | null>(null);
     const [deleting, setDeleting] = useState<Document | null>(null);
 
     const options = useMemo(() => allowedClassifications(project.base_classification.value as BaseClassificationValue), [project.base_classification.value]);
@@ -131,14 +129,14 @@ export default function Index({ project, documents }: { project: Project; docume
                                                 {project.can.update && (
                                                     <>
                                                         <Tooltip label="Edit document">
-                                                            <Button
+                                                            <ButtonLink
+                                                                href={documentShow.url([project.id, document.id], { query: { tab: 'edit' } })}
                                                                 variant="ghost"
                                                                 size="icon"
                                                                 aria-label="Edit document"
-                                                                onClick={() => setEditing(document)}
                                                             >
                                                                 <Pencil className="h-4 w-4" aria-hidden />
-                                                            </Button>
+                                                            </ButtonLink>
                                                         </Tooltip>
                                                         <Tooltip label="Delete document">
                                                             <Button
@@ -163,8 +161,6 @@ export default function Index({ project, documents }: { project: Project; docume
             </div>
 
             <UploadDocumentModal project={project} open={uploadOpen} onClose={() => setUploadOpen(false)} options={options} />
-
-            {editing && <EditDocumentModal project={project} document={editing} onClose={() => setEditing(null)} options={options} />}
 
             <ConfirmDialog
                 open={deleting !== null}

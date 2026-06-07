@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\DurationUnit;
 use App\Enums\RiskLevel;
 use App\Enums\TaskStatus;
 use App\Models\Concerns\HasClassification;
 use App\Models\Concerns\HasUserStamps;
 use App\Models\Concerns\LogsModelActivity;
+use App\Support\Schedule;
+use App\Support\WorkCalendar;
 use Carbon\CarbonImmutable;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -32,6 +35,7 @@ use Illuminate\Support\Facades\DB;
     'description',
     'start_date',
     'duration_days',
+    'duration_unit',
     'is_date_locked',
     'status',
     'percent_complete',
@@ -60,6 +64,7 @@ class Task extends Model
         return [
             'start_date' => 'date',
             'duration_days' => 'integer',
+            'duration_unit' => DurationUnit::class,
             'is_date_locked' => 'boolean',
             'hierarchy_level' => 'integer',
             'sort_order' => 'integer',
@@ -84,6 +89,8 @@ class Task extends Model
             if ($task->isForceDeleting()) {
                 return;
             }
+
+            $task->load('children');
 
             $task->children->each(fn (Task $child) => $child->delete());
         });
@@ -194,12 +201,9 @@ class Task extends Model
     }
 
     /**
-     * The derived end date at day-grain resolution: end = start + duration.
-     * A one-day task ends on its start date.
-     *
-     * MVP is calendar-day grain. Workday/holiday-aware computation (FR-5, PRD
-     * §5) is the documented future swap point: this single method becomes the
-     * seam once project calendars exist — callers and the resource stay put.
+     * The derived end date at day-grain resolution. Calendar-day tasks add
+     * duration − 1 calendar days; work-day tasks count only working days on the
+     * project's calendar (see {@see Project::workCalendar()}).
      */
     public function endDate(): ?CarbonImmutable
     {
@@ -207,7 +211,16 @@ class Task extends Model
             return null;
         }
 
-        return $this->start_date->addDays(max(0, $this->duration_days - 1));
+        $calendar = $this->relationLoaded('project')
+            ? $this->project->workCalendar()
+            : WorkCalendar::default();
+
+        return Schedule::endDate(
+            $this->start_date,
+            $this->duration_days,
+            $this->duration_unit,
+            $calendar,
+        );
     }
 
     /**

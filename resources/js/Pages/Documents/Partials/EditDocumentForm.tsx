@@ -19,10 +19,7 @@ type EditDocumentFormProps = {
     onCancel?: () => void;
 };
 
-/**
- * The document metadata edit form. Used inline on the show page's Edit tab and
- * inside EditDocumentModal so there is a single form implementation.
- */
+/** The document metadata edit form, used on the show page's Edit tab. */
 export default function EditDocumentForm({ project, document, options, onSuccess, onCancel }: EditDocumentFormProps) {
     const form = useForm<{ name: string; description: string; base_classification: BaseClassificationValue }>({
         name: document.name,

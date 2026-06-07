@@ -9,17 +9,18 @@ import Select from '@/components/ui/select';
 import SectionNav, { type SectionNavItem } from '@/components/ui/section-nav';
 import UploadDocumentModal from '@/Pages/Documents/Partials/UploadDocumentModal';
 import TaskForm from '@/Pages/Tasks/Partials/TaskForm';
+import UpdatePercentCompleteModal from '@/Pages/Tasks/Partials/UpdatePercentCompleteModal';
 import { riskTone, statusTone } from '@/Pages/Tasks/Partials/badges';
 import AppLayout from '@/layouts/app-layout';
 import { destroy as taskCommentDestroy, store as taskCommentStore, update as taskCommentUpdate } from '@/routes/projects/tasks/comments';
 import { destroy as dependencyDestroy, store as dependencyStore } from '@/routes/projects/tasks/dependencies';
 import { destroy as taskDocumentDestroy, store as taskDocumentStore, upload as taskDocumentUpload } from '@/routes/projects/tasks/documents';
-import { destroy as taskDestroy, index as tasksIndex, show as taskShow } from '@/routes/projects/tasks';
+import { destroy as taskDestroy, complete as taskComplete, index as tasksIndex, show as taskShow } from '@/routes/projects/tasks';
 import { type BaseClassificationValue, type Dependency, type Document, type Project, type Task } from '@/types';
 import { allowedClassifications } from '@/utils/classification';
 import { formatDateTime } from '@/utils/date';
 import { Link, useForm, usePage } from '@inertiajs/react';
-import { ArrowLeft, Download, GitBranch, History, Info, Lock, LockOpen, MessageSquare, Paperclip, Pencil, Trash2, Upload } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Download, GitBranch, History, Info, Lock, LockOpen, MessageSquare, Paperclip, Pencil, Trash2, Upload } from 'lucide-react';
 import { type FormEvent, type ReactNode, useMemo, useState } from 'react';
 
 type TabKey = 'details' | 'comments' | 'dependencies' | 'attachments' | 'history' | 'edit';
@@ -57,6 +58,36 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
             <dt className="text-sm text-slate-500 sm:w-44 sm:shrink-0 dark:text-neutral-400">{label}</dt>
             <dd className="min-w-0 text-sm text-slate-900 dark:text-white">{children}</dd>
         </div>
+    );
+}
+
+function ParentTaskCard({ project, task }: { project: Project; task: Task }) {
+    const parent = task.parent;
+
+    if (! parent) {
+        return null;
+    }
+
+    return (
+        <Card padding="none" className="overflow-hidden">
+            <div className="border-b border-border px-4 py-2.5 text-xs font-medium text-slate-500 dark:border-border-dark dark:text-neutral-400">
+                Parent task
+            </div>
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+                <Link
+                    href={taskShow.url([project.id, parent.id])}
+                    className="truncate text-sm text-slate-900 hover:text-accent-700 dark:text-white dark:hover:text-accent-300"
+                >
+                    {parent.name}
+                </Link>
+                <div className="flex shrink-0 items-center gap-2">
+                    <Badge tone={statusTone(parent.status.value)}>{parent.status.label}</Badge>
+                    <span className="w-10 text-right text-xs text-slate-500 tabular-nums dark:text-neutral-400">
+                        {parent.percent_complete}%
+                    </span>
+                </div>
+            </div>
+        </Card>
     );
 }
 
@@ -111,7 +142,9 @@ function DetailsPane({ task }: { task: Task }) {
                     <Badge tone="accent">{task.base_classification.label}</Badge>
                 </DetailRow>
                 <DetailRow label="Start date">{task.start_date ?? <span className="text-slate-400 dark:text-neutral-500">Unscheduled</span>}</DetailRow>
-                <DetailRow label="Duration">{task.duration_days} day{task.duration_days === 1 ? '' : 's'}</DetailRow>
+                <DetailRow label="Duration">
+                    {task.duration_days} {task.duration_unit.label.toLowerCase()}
+                </DetailRow>
                 <DetailRow label="End date">{task.end_date ?? <span className="text-slate-400 dark:text-neutral-500">—</span>}</DetailRow>
                 <DetailRow label="Dates">
                     <span className="inline-flex items-center gap-1.5">
@@ -422,6 +455,10 @@ export default function Show({
     const tab = useActiveTab(canEdit);
     const showUrl = taskShow.url([project.id, task.id]);
     const [deleting, setDeleting] = useState(false);
+    const [confirmingComplete, setConfirmingComplete] = useState(false);
+    const [percentOpen, setPercentOpen] = useState(false);
+
+    const isComplete = task.status.value === 'complete';
 
     const comments = task.comments ?? [];
     const activities = task.activities ?? [];
@@ -433,6 +470,28 @@ export default function Show({
     );
 
     const deleteForm = useForm({});
+    const completeForm = useForm<{ include_subtasks: boolean }>({ include_subtasks: false });
+
+    const requestComplete = () => {
+        if (task.has_incomplete_descendants) {
+            setConfirmingComplete(true);
+
+            return;
+        }
+
+        completeForm.transform(() => ({ include_subtasks: false }));
+        completeForm.post(taskComplete.url([project.id, task.id]), {
+            preserveScroll: true,
+        });
+    };
+
+    const confirmComplete = () => {
+        completeForm.transform(() => ({ include_subtasks: true }));
+        completeForm.post(taskComplete.url([project.id, task.id]), {
+            preserveScroll: true,
+            onSuccess: () => setConfirmingComplete(false),
+        });
+    };
 
     const tabs: SectionNavItem<TabKey>[] = [
         { key: 'details', label: 'Details', href: `${showUrl}?tab=details`, icon: Info },
@@ -461,15 +520,31 @@ export default function Show({
     return (
         <AppLayout title={task.name} project={project}>
             <div className="flex flex-col gap-6">
-                <div className="min-w-0">
-                    <Link
-                        href={tasksIndex.url(project.id)}
-                        className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-neutral-200"
-                    >
-                        <ArrowLeft className="h-4 w-4" aria-hidden />
-                        Tasks
-                    </Link>
-                    <h1 className="mt-1 truncate text-lg font-semibold tracking-tight text-slate-900 dark:text-white">{task.name}</h1>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                        <Link
+                            href={tasksIndex.url(project.id)}
+                            className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+                        >
+                            <ArrowLeft className="h-4 w-4" aria-hidden />
+                            Tasks
+                        </Link>
+                        <h1 className="mt-1 truncate text-lg font-semibold tracking-tight text-slate-900 dark:text-white">{task.name}</h1>
+                    </div>
+
+                    {canEdit && (
+                        <div className="flex shrink-0 items-center gap-2">
+                            <Button variant="secondary" onClick={() => setPercentOpen(true)}>
+                                Update progress
+                            </Button>
+                            {!isComplete && (
+                                <Button onClick={requestComplete} disabled={completeForm.processing}>
+                                    <CheckCircle2 className="mr-2 h-4 w-4" aria-hidden />
+                                    Mark complete
+                                </Button>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex flex-col gap-6 sm:flex-row">
@@ -478,6 +553,7 @@ export default function Show({
                     <div className="min-w-0 flex-1">
                         {tab === 'details' && (
                             <div className="flex flex-col gap-6">
+                                <ParentTaskCard project={project} task={task} />
                                 <SubtasksCard project={project} task={task} />
                                 <DetailsPane task={task} />
                             </div>
@@ -517,6 +593,20 @@ export default function Show({
                     </div>
                 </div>
             </div>
+
+            <ConfirmDialog
+                open={confirmingComplete}
+                title="Mark task complete"
+                description={`“${task.name}” has incomplete subtasks. Mark this task and all subtasks as complete?`}
+                confirmLabel="Mark all complete"
+                processing={completeForm.processing}
+                onConfirm={confirmComplete}
+                onCancel={() => setConfirmingComplete(false)}
+            />
+
+            {canEdit && (
+                <UpdatePercentCompleteModal project={project} task={task} open={percentOpen} onClose={() => setPercentOpen(false)} />
+            )}
 
             <ConfirmDialog
                 open={deleting}

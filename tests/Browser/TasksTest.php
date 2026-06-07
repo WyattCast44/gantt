@@ -8,6 +8,29 @@ use App\Models\User;
 
 use function Pest\Laravel\actingAs;
 
+test('the task edit tab renders without javascript errors', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $task = Task::factory()->forProject($project)->create(['name' => 'EO Calibration']);
+    actingAs($owner);
+
+    visit("/projects/{$project->id}/tasks/{$task->id}?tab=edit")
+        ->assertSee('Edit')
+        ->assertSee('Save changes')
+        ->assertNoJavascriptErrors();
+});
+
+test('the task create page renders without javascript errors', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    actingAs($owner);
+
+    visit("/projects/{$project->id}/tasks/create")
+        ->assertSee('New task')
+        ->assertSee('Create task')
+        ->assertNoJavascriptErrors();
+});
+
 test('the tasks page renders the tree without javascript errors', function () {
     $owner = User::factory()->create();
     $project = Project::factory()->withOwner($owner)->create();
@@ -46,6 +69,8 @@ test('the task detail page renders its tabs without javascript errors', function
         ->assertSee('EO Calibration')
         ->assertSee('Details')
         ->assertSee('Dependencies')
+        ->assertSee('Mark complete')
+        ->assertSee('Update progress')
         ->assertNoJavascriptErrors();
 });
 
@@ -59,6 +84,19 @@ test('the task detail page lists its subtasks', function () {
     visit("/projects/{$project->id}/tasks/{$parent->id}")
         ->assertSee('Subtasks')
         ->assertSee('Sensor Integration')
+        ->assertNoJavascriptErrors();
+});
+
+test('the task detail page links to its parent task', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $parent = Task::factory()->forProject($project)->create(['name' => 'Aircraft']);
+    $child = Task::factory()->forProject($project)->child($parent)->create(['name' => 'Sensor Integration']);
+    actingAs($owner);
+
+    visit("/projects/{$project->id}/tasks/{$child->id}")
+        ->assertSee('Parent task')
+        ->assertSee('Aircraft')
         ->assertNoJavascriptErrors();
 });
 
