@@ -39,8 +39,21 @@ export default function EditDocumentForm({ project, document, options, onSuccess
     };
 
     return (
-        <form onSubmit={submit} className="flex flex-col gap-5">
-            <Fieldset>
+        <form onSubmit={submit}>
+            <Fieldset
+                footer={
+                    <>
+                        {onCancel && (
+                            <Button variant="secondary" onClick={onCancel} disabled={form.processing}>
+                                Cancel
+                            </Button>
+                        )}
+                        <Button type="submit" disabled={form.processing}>
+                            Save changes
+                        </Button>
+                    </>
+                }
+            >
                 <FieldRow label="Name" htmlFor="edit-name" required>
                     <Input id="edit-name" value={form.data.name} onChange={(event) => form.setData('name', event.target.value)} required />
                     <InputError message={form.errors.name} className="mt-1" />
@@ -70,17 +83,6 @@ export default function EditDocumentForm({ project, document, options, onSuccess
                     <InputError message={form.errors.base_classification} className="mt-1" />
                 </FieldRow>
             </Fieldset>
-
-            <div className="flex justify-end gap-2">
-                {onCancel && (
-                    <Button variant="secondary" onClick={onCancel} disabled={form.processing}>
-                        Cancel
-                    </Button>
-                )}
-                <Button type="submit" disabled={form.processing}>
-                    Save changes
-                </Button>
-            </div>
         </form>
     );
 }

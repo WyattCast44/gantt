@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Enums\BaseClassification;
+use App\Models\Comment;
 use App\Models\Document;
 use App\Models\Project;
 use App\Models\ProjectInvitation;
@@ -40,6 +41,7 @@ class AppServiceProvider extends ServiceProvider
             'project' => Project::class,
             'project_invitation' => ProjectInvitation::class,
             'document' => Document::class,
+            'comment' => Comment::class,
         ]);
 
         return $this;

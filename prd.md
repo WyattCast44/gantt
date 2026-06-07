@@ -2,7 +2,7 @@
 
 Operational Test Timeline & Dependency Management Platform
 
-_Version 9 - Phases 1–4 Implemented (Architecture, Auth & RBAC, Project Topologies + Workspace Shell + Membership, Document Ingestion)_
+_Version 10 - Phases 1–5 Implemented (Architecture, Auth & RBAC, Project Topologies + Workspace Shell + Membership, Document Ingestion, Polymorphic Commenting)_
 
 # Overview
 
@@ -685,9 +685,9 @@ Delivered project CRUD (create / edit / archive / restore), the per-project Sett
 
 Multi-MIME upload controllers bound to project context, with an abstract storage layer (local vs. cloud) and automated metadata indexing plus audit trails. Delivered: the `documents` table + rich `Document` model with per-field classification (constrained by the project baseline), a config-driven `documents` disk (private `local` by default, swappable to `s3`), upload/update/delete + authorized streamed download/inline-preview controllers, the Documents index and show page (upload modal, list, click-through, inline preview, download, edit, delete), and unit/feature/browser tests. See "Implementation Status & Established Conventions (through Phase 4)".
 
-### Phase 5 - Polymorphic Commenting Infrastructure
+### Phase 5 - Polymorphic Commenting Infrastructure — ✅ COMPLETED
 
-Deploy the polymorphic comment schema and hook threads onto Document first to prove the plumbing across the API boundary before wiring it to Tasks.
+Deploy the polymorphic comment schema and hook threads onto Document first to prove the plumbing across the API boundary before wiring it to Tasks. Delivered: the polymorphic `comments` table + rich `Comment` model (`commentable` morphTo, per-field classification constrained by the project baseline), `CommentPolicy` (editors+ create, author edits own, owner/admin moderate-delete), Store/Update FormRequests, `CommentResource` (per-comment `can{}` block), a skinny nested `CommentController` (store/update/destroy), the comments thread on the Documents show page (a Comments tab), and unit/feature/browser tests. See "Implementation Status & Established Conventions (through Phase 5)".
 
 ### Phase 6 - Task Core Lifecycle & Temporal Logic Plumbing
 
@@ -829,6 +829,40 @@ This section records what Phase 4 added on top of the Phase 1–3 foundation. Ph
 
 ## Phase 5 Starting Point
 Document ingestion (model, storage, controllers, index **and show page**) is in place and the `document` morph alias is registered. The show page is the intended host for comment threads: Phase 5 (Polymorphic Commenting) can hook comments onto `Document` (e.g. a new Comments section/tab on `Documents/Show`) to prove the polymorphic plumbing before wiring it to Tasks. The domain-event/listener foundation is still deferred to Phase 6.
+
+# Implementation Status & Established Conventions (through Phase 5)
+
+This section records what Phase 5 added on top of the Phase 1–4 foundation. Phases 1–5 are complete and fully tested (156 tests passing at the close of Phase 5).
+
+## Product decisions (Phase 5)
+- **Threading:** comments are a **flat chronological list** — no nested replies in V1 (a `parent_id` self-reference can be added later without reshaping the schema).
+- **Classification:** each comment carries its **own per-field `base_classification`**, constrained by the project baseline (the first per-field marking in the app, proving the `BaseClassification::dominates()` seam beyond the document-level baseline).
+- **Permissions:** editors+ create; the **author** edits/deletes their own comment; the project **owner/admin** may delete any comment (moderation); viewers are read-only.
+
+## Backend (Phase 5)
+
+### Data model
+- **`comments` table** — polymorphic `$table->morphs('commentable')` (`commentable_id` + `commentable_type` + composite index), `body` text, the `classification()` macro (per-field marking, default UNCLASSIFIED), plus `userStamps()` + `softDeletesWithUserStamps()`. Morph alias `comment`.
+- **`Comment` model (rich)** — traits `HasClassification`, `HasFactory`, `HasUserStamps`, `SoftDeletes`; **`#[Fillable]`** limited to `body` + `base_classification` — the `commentable` association is set via the relationship (`$document->comments()->create(...)`), never mass-assigned. Relation `commentable(): MorphTo`; `creator()` from `HasUserStamps`.
+- **`Document` model** gained `comments(): MorphMany`. (Wiring comments to `Task` is deferred to Phase 6, when the Task model exists; the factory's `forTask()` state lands then.)
+- **Audit trail** is the existing `HasUserStamps` (author = `created_by`). The generic domain-event bus is still deferred to Phase 6 — no `CommentCreated` event yet.
+
+### HTTP / routing
+- **Controller (skinny, no services — C5):** `CommentController` — `store/update/destroy` only (comments load with the document show page, so there is no `index`/`show`); each action redirects back. `destroy` calls `$this->authorize('delete', $comment)` then soft-deletes.
+- **FormRequests:** `StoreCommentRequest` (`authorize` via `can('create', [Comment::class, $document])`) and `UpdateCommentRequest` (`authorize` via `can('update', $comment)`), both with `body` + `base_classification` rules, the project-baseline `after()` guard (reusing `dominates()`), and a typed `classification()` accessor.
+- **API Resource:** `CommentResource` — `body`, `base_classification` as `{value,label}`, `author` (`whenLoaded('creator')` → `{id,name}`), ISO8601 timestamps, and a **per-comment `can{update,delete}` block**. Unlike `DocumentResource` (which reuses a project-level ability block to avoid N+1), comment abilities are per-author, so the per-row block is necessary; `DocumentController@show` sets the `commentable`→`project` relations from the models already in hand so the policy walk adds no per-comment queries and never trips `shouldBeStrict()` lazy-loading.
+- **Routes** (`routes/dashboard.php`, project-scoped behind `project.member` + `scopeBindings`): `projects.documents.comments.{store,update,destroy}`.
+
+### Authorization
+- **`CommentPolicy`** (auto-discovered) — `create(User, Document)` = `canEdit()`; `update(User, Comment)` = author only; `delete(User, Comment)` = author **or** `canManageMembers()` on the commentable's project.
+
+## Frontend (Phase 5)
+- **Documents show page** (`resources/js/Pages/Documents/Show.tsx`) — a new **Comments** tab (`MessageSquare` icon, with a live count) in the existing `SectionNav`, visible to all members (viewers included).
+- **Comment thread** (`resources/js/Pages/Documents/Partials/CommentsSection.tsx`) — a composer (editors+ only, `Textarea` + baseline-capped classification `Select`) and a flat list of comment cards (`Avatar` + author + relative timestamp + classification `Badge` + body), each with a `DropdownMenu` exposing inline **Edit** (when `comment.can.update`) and **Delete** via `ConfirmDialog` (when `comment.can.delete`). All actions use `useForm` against the Wayfinder comment routes with `preserveScroll`. No new dependencies — reuses the existing `components/ui` primitives, `formatRelativeDate`/`formatDateTime`, and `@/utils/classification`.
+- **Types** — `@/types` gained `Comment` (incl. the `can{}` block); `Document` gained `comments: Comment[]`.
+
+## Phase 6 Starting Point
+The polymorphic comment plumbing is proven end-to-end on `Document`. Phase 6 (Task Core Lifecycle) can: register the `task` morph alias, add `Task::comments(): MorphMany`, add the `CommentFactory::forTask()` state, and reuse `CommentsSection` on the task detail view. The `update`/`delete` abilities and `CommentResource` already generalize over any commentable whose project is resolvable via `commentable->project`; only the `create` gate (typed to `Document` today, and the document-scoped `CommentController`/routes) needs a task-scoped counterpart. The generic domain-event/listener foundation (`TaskCreated`/`TaskUpdated`, and retrofitting a `CommentCreated` listener) is also built in Phase 6.
 
 # Architecture Issues - Resolved
 

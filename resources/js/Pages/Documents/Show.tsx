@@ -5,6 +5,7 @@ import Button from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 import SectionNav, { type SectionNavItem } from '@/components/ui/section-nav';
+import CommentsSection from '@/Pages/Documents/Partials/CommentsSection';
 import EditDocumentForm from '@/Pages/Documents/Partials/EditDocumentForm';
 import AppLayout from '@/layouts/app-layout';
 import { destroy as documentDestroy, index as documentsIndex, show as documentShow } from '@/routes/projects/documents';
@@ -12,10 +13,10 @@ import { type BaseClassificationValue, type Document, type Project } from '@/typ
 import { allowedClassifications } from '@/utils/classification';
 import { formatDateTime } from '@/utils/date';
 import { Link, useForm, usePage } from '@inertiajs/react';
-import { ArrowLeft, Download, Eye, FileText, Info, Pencil } from 'lucide-react';
+import { ArrowLeft, Download, Eye, FileText, Info, MessageSquare, Pencil } from 'lucide-react';
 import { type ReactNode, useMemo, useState } from 'react';
 
-type TabKey = 'preview' | 'details' | 'edit';
+type TabKey = 'preview' | 'details' | 'comments' | 'edit';
 
 function useActiveTab(canEdit: boolean): TabKey {
     const page = usePage();
@@ -23,6 +24,10 @@ function useActiveTab(canEdit: boolean): TabKey {
 
     if (tab === 'edit') {
         return canEdit ? 'edit' : 'preview';
+    }
+
+    if (tab === 'comments') {
+        return 'comments';
     }
 
     return tab === 'details' ? 'details' : 'preview';
@@ -118,6 +123,12 @@ export default function Show({ project, document }: { project: Project; document
     const tabs: SectionNavItem<TabKey>[] = [
         { key: 'preview', label: 'Preview', href: showUrl, icon: Eye },
         { key: 'details', label: 'Details', href: `${showUrl}?tab=details`, icon: Info },
+        {
+            key: 'comments',
+            label: `Comments${document.comments.length > 0 ? ` (${document.comments.length})` : ''}`,
+            href: `${showUrl}?tab=comments`,
+            icon: MessageSquare,
+        },
         ...(canEdit ? [{ key: 'edit' as const, label: 'Edit', href: `${showUrl}?tab=edit`, icon: Pencil }] : []),
     ];
 
@@ -150,11 +161,10 @@ export default function Show({ project, document }: { project: Project; document
                     <div className="min-w-0 flex-1">
                         {tab === 'preview' && <PreviewPane document={document} />}
                         {tab === 'details' && <DetailsPane document={document} />}
+                        {tab === 'comments' && <CommentsSection project={project} document={document} options={options} />}
                         {tab === 'edit' && canEdit && (
                             <div className="flex flex-col gap-6">
-                                <Card>
-                                    <EditDocumentForm project={project} document={document} options={options} />
-                                </Card>
+                                <EditDocumentForm project={project} document={document} options={options} />
 
                                 <Card className="flex flex-col gap-3 border-red-200 sm:flex-row sm:items-center sm:justify-between dark:border-red-900/40">
                                     <div>

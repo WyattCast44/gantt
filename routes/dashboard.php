@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\AcceptInvitationController;
+use App\Http\Controllers\CommentController;
 use App\Http\Controllers\DeclineInvitationController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\DownloadDocumentController;
@@ -113,6 +114,21 @@ Route::get('/projects/{project}/documents/{document}/preview', PreviewDocumentCo
     ->middleware('project.member')
     ->scopeBindings()
     ->name('projects.documents.preview');
+
+Route::post('/projects/{project}/documents/{document}/comments', [CommentController::class, 'store'])
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.documents.comments.store');
+
+Route::patch('/projects/{project}/documents/{document}/comments/{comment}', [CommentController::class, 'update'])
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.documents.comments.update');
+
+Route::delete('/projects/{project}/documents/{document}/comments/{comment}', [CommentController::class, 'destroy'])
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.documents.comments.destroy');
 
 /*
 |-----------------------------------------------------------------------------

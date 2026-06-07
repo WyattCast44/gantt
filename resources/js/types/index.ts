@@ -92,6 +92,20 @@ export interface ProjectInvitation {
     accept_url: string;
 }
 
+/** A comment attached to a document or task (CommentResource). */
+export interface Comment {
+    id: number;
+    body: string;
+    base_classification: Labeled<BaseClassificationValue>;
+    author?: { id: number; name: string };
+    created_at: string | null;
+    updated_at: string | null;
+    can: {
+        update: boolean;
+        delete: boolean;
+    };
+}
+
 /** A project document (DocumentResource). */
 export interface Document {
     id: number;
@@ -108,6 +122,7 @@ export interface Document {
     updated_at: string | null;
     download_url: string;
     preview_url: string;
+    comments: Comment[];
 }
 
 export interface SharedProps {

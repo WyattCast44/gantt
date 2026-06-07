@@ -8,6 +8,7 @@ use App\Http\Requests\StoreDocumentRequest;
 use App\Http\Requests\UpdateDocumentRequest;
 use App\Http\Resources\DocumentResource;
 use App\Http\Resources\ProjectResource;
+use App\Models\Comment;
 use App\Models\Document;
 use App\Models\Project;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -38,9 +39,20 @@ class DocumentController
      */
     public function show(Project $project, Document $document): Response
     {
+        // Set the relations the CommentPolicy walks (commentable -> project) from
+        // the models already in hand, so authorization does not trigger queries
+        // or lazy-loading violations per comment.
+        $document->setRelation('project', $project);
+
+        $document->load(['creator', 'comments' => fn ($query) => $query->with('creator')->latest()]);
+
+        $document->comments->each(
+            fn (Comment $comment) => $comment->setRelation('commentable', $document),
+        );
+
         return Inertia::render('Documents/Show', [
             'project' => new ProjectResource($project),
-            'document' => new DocumentResource($document->load('creator')),
+            'document' => new DocumentResource($document),
         ]);
     }
 

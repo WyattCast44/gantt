@@ -70,7 +70,7 @@ class StoreDocumentRequest extends FormRequest
                 /** @var array<int, array<string, mixed>> $fileMeta */
                 $fileMeta = $this->input('file_meta', []);
 
-                foreach ($this->uploadedFiles() as $index => $_) {
+                foreach (array_keys($this->uploadedFiles()) as $index) {
                     $markingValue = $fileMeta[$index]['base_classification'] ?? null;
 
                     if (! is_string($markingValue) || $markingValue === '') {

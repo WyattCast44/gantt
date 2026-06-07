@@ -44,6 +44,7 @@ class DocumentResource extends JsonResource
             'updated_at' => $this->updated_at?->toIso8601String(),
             'download_url' => route('projects.documents.download', [$this->project_id, $this->id]),
             'preview_url' => route('projects.documents.preview', [$this->project_id, $this->id]),
+            'comments' => CommentResource::collection($this->whenLoaded('comments')),
         ];
     }
 }

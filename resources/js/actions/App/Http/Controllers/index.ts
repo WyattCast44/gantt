@@ -6,6 +6,7 @@ import ProjectInvitationController from './ProjectInvitationController'
 import DocumentController from './DocumentController'
 import DownloadDocumentController from './DownloadDocumentController'
 import PreviewDocumentController from './PreviewDocumentController'
+import CommentController from './CommentController'
 import InvitationController from './InvitationController'
 import AcceptInvitationController from './AcceptInvitationController'
 import DeclineInvitationController from './DeclineInvitationController'
@@ -21,6 +22,7 @@ const Controllers = {
     DocumentController: Object.assign(DocumentController, DocumentController),
     DownloadDocumentController: Object.assign(DownloadDocumentController, DownloadDocumentController),
     PreviewDocumentController: Object.assign(PreviewDocumentController, PreviewDocumentController),
+    CommentController: Object.assign(CommentController, CommentController),
     InvitationController: Object.assign(InvitationController, InvitationController),
     AcceptInvitationController: Object.assign(AcceptInvitationController, AcceptInvitationController),
     DeclineInvitationController: Object.assign(DeclineInvitationController, DeclineInvitationController),
