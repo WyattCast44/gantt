@@ -1,6 +1,13 @@
 name: gantt
 icon: null
 processes:
+  Vite:
+    command: npm run dev
+    working_dir: null
+    auto_start: true
+    auto_restart: true
+    restart_when_changed: []
+    env: {}
   Lint / Test:
     command: vendor/bin/rector && vendor/bin/pint && vendor/bin/pest -p
     working_dir: null
@@ -8,8 +15,8 @@ processes:
     auto_restart: false
     restart_when_changed: []
     env: {}
-  Vite:
-    command: npm run dev
+  Scheduler:
+    command: php artisan schedule:work
     working_dir: null
     auto_start: true
     auto_restart: true

@@ -6,9 +6,11 @@ namespace App\Providers;
 
 use App\Enums\BaseClassification;
 use App\Models\Project;
+use App\Models\ProjectInvitation;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -26,6 +28,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Inertia (not REST): resources shape props directly, so drop the
+        // top-level "data" envelope from resource payloads.
+        JsonResource::withoutWrapping();
+
         $this
             ->configureModelMorphMap()
             ->configureMigrationMacros();
@@ -36,6 +42,7 @@ class AppServiceProvider extends ServiceProvider
         Relation::enforceMorphMap([
             'user' => User::class,
             'project' => Project::class,
+            'project_invitation' => ProjectInvitation::class,
         ]);
 
         return $this;

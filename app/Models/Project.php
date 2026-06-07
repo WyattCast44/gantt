@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable(['owner_id', 'name', 'description', 'start_date', 'end_date', 'status', 'base_classification', 'special_access_required', 'handling_caveats', 'programs'])]
@@ -78,6 +79,16 @@ class Project extends Model
     }
 
     /**
+     * Invitations issued for this project (pending and resolved).
+     *
+     * @return HasMany<ProjectInvitation, $this>
+     */
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(ProjectInvitation::class);
+    }
+
+    /**
      * Determine whether the given user owns this project.
      */
     public function isOwner(User $user): bool
@@ -110,5 +121,26 @@ class Project extends Model
     {
         return $this->isOwner($user)
             || $this->members()->where('users.id', $user->id)->exists();
+    }
+
+    /**
+     * Change an invited member's role. The owner is authoritative and cannot be
+     * demoted, regardless of the requester's role.
+     */
+    public function updateMemberRole(User $member, Role $role): void
+    {
+        abort_if($this->isOwner($member), 403, 'The project owner cannot be modified.');
+
+        $this->members()->updateExistingPivot($member->id, ['role' => $role->value]);
+    }
+
+    /**
+     * Remove an invited member. The owner cannot be removed.
+     */
+    public function removeMember(User $member): void
+    {
+        abort_if($this->isOwner($member), 403, 'The project owner cannot be modified.');
+
+        $this->members()->detach($member->id);
     }
 }

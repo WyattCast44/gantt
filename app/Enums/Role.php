@@ -12,6 +12,19 @@ enum Role: string
     case Viewer = 'viewer';
 
     /**
+     * Human-readable label for display.
+     */
+    public function label(): string
+    {
+        return match ($this) {
+            self::Owner => 'Owner',
+            self::Admin => 'Admin',
+            self::Editor => 'Editor',
+            self::Viewer => 'Viewer',
+        };
+    }
+
+    /**
      * Whether this role may invite/remove members and change roles.
      */
     public function canManageMembers(): bool
