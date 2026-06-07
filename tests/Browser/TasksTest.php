@@ -49,6 +49,19 @@ test('the task detail page renders its tabs without javascript errors', function
         ->assertNoJavascriptErrors();
 });
 
+test('the task detail page lists its subtasks', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $parent = Task::factory()->forProject($project)->create(['name' => 'Aircraft']);
+    Task::factory()->forProject($project)->child($parent)->create(['name' => 'Sensor Integration']);
+    actingAs($owner);
+
+    visit("/projects/{$project->id}/tasks/{$parent->id}")
+        ->assertSee('Subtasks')
+        ->assertSee('Sensor Integration')
+        ->assertNoJavascriptErrors();
+});
+
 test('the task dependencies tab renders an empty state without javascript errors', function () {
     $owner = User::factory()->create();
     $project = Project::factory()->withOwner($owner)->create();

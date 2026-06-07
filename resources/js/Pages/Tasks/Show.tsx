@@ -60,6 +60,43 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
     );
 }
 
+function SubtasksCard({ project, task }: { project: Project; task: Task }) {
+    const children = task.children ?? [];
+
+    if (children.length === 0) {
+        return null;
+    }
+
+    return (
+        <Card padding="none" className="overflow-hidden">
+            <div className="border-b border-border px-4 py-2.5 text-xs font-medium text-slate-500 dark:border-border-dark dark:text-neutral-400">
+                Subtasks ({children.length})
+            </div>
+            <ul>
+                {children.map((child) => (
+                    <li
+                        key={child.id}
+                        className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 last:border-0 dark:border-border-dark"
+                    >
+                        <Link
+                            href={taskShow.url([project.id, child.id])}
+                            className="truncate text-sm text-slate-900 hover:text-accent-700 dark:text-white dark:hover:text-accent-300"
+                        >
+                            {child.name}
+                        </Link>
+                        <div className="flex shrink-0 items-center gap-2">
+                            <Badge tone={statusTone(child.status.value)}>{child.status.label}</Badge>
+                            <span className="w-10 text-right text-xs text-slate-500 tabular-nums dark:text-neutral-400">
+                                {child.percent_complete}%
+                            </span>
+                        </div>
+                    </li>
+                ))}
+            </ul>
+        </Card>
+    );
+}
+
 function DetailsPane({ task }: { task: Task }) {
     return (
         <Card padding="none">
@@ -439,7 +476,12 @@ export default function Show({
                     <SectionNav items={tabs} activeKey={tab} />
 
                     <div className="min-w-0 flex-1">
-                        {tab === 'details' && <DetailsPane task={task} />}
+                        {tab === 'details' && (
+                            <div className="flex flex-col gap-6">
+                                <SubtasksCard project={project} task={task} />
+                                <DetailsPane task={task} />
+                            </div>
+                        )}
                         {tab === 'comments' && (
                             <CommentsThread
                                 comments={comments}

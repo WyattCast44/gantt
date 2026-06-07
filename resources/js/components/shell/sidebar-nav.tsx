@@ -14,7 +14,6 @@ import { focusRingNeutral } from '@/utils/focusRing';
 import { sidebarNavLinkClasses } from '@/utils/navLink';
 import { Link, usePage } from '@inertiajs/react';
 import {
-    Calendar,
     FileText,
     FolderKanban,
     GanttChartSquare,
@@ -65,7 +64,6 @@ function projectItems(project: Project, current: string): NavLink[] {
         { key: 'overview', label: 'Overview', icon: LayoutGrid, href: overviewUrl, active: current === overviewUrl },
         { key: 'timeline', label: 'Timeline', icon: GanttChartSquare, disabled: true },
         { key: 'tasks', label: 'Tasks', icon: ListTree, href: tasksUrl, active: current.startsWith(tasksUrl) },
-        { key: 'calendar', label: 'Calendar', icon: Calendar, disabled: true },
         { key: 'documents', label: 'Documents', icon: FileText, href: documentsUrl, active: current.startsWith(documentsUrl) },
     ];
 

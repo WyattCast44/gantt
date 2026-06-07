@@ -171,6 +171,20 @@ test('the index renders the project task tree', function () {
         );
 });
 
+test('the show payload includes direct child tasks', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $parent = Task::factory()->forProject($project)->create();
+    Task::factory()->forProject($project)->child($parent)->create(['name' => 'Calibrate sensor']);
+
+    $this->actingAs($owner)->get(route('projects.tasks.show', [$project, $parent]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('task.children', 1)
+            ->where('task.children.0.name', 'Calibrate sensor')
+        );
+});
+
 test('the show payload includes the derived end date and metadata', function () {
     $owner = User::factory()->create();
     $project = Project::factory()->withOwner($owner)->create();
