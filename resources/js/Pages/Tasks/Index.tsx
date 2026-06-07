@@ -108,7 +108,7 @@ export default function Index({ project, tasks }: { project: Project; tasks: Tas
                     </Card>
                 ) : (
                     <Card padding="none" className="overflow-hidden">
-                        <ul>
+                        <ul className="divide-y divide-border dark:divide-border-dark">
                             {tasks.map((task) => (
                                 <TaskRow
                                     key={task.id}
@@ -209,7 +209,7 @@ function TaskRow({ project, task, depth, expanded, onToggle, onAddChild, onEdit,
         <li>
             <div
                 onClick={() => router.visit(taskShow.url([project.id, task.id]))}
-                className="group flex cursor-pointer items-center gap-2 border-b border-border px-3 py-2.5 hover:bg-slate-50 dark:border-border-dark dark:hover:bg-neutral-800/40"
+                className="group flex cursor-pointer items-center gap-2 px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-neutral-800/40"
                 style={{ paddingLeft: `${depth * 20 + 12}px` }}
             >
                 {hasChildren ? (
@@ -278,7 +278,7 @@ function TaskRow({ project, task, depth, expanded, onToggle, onAddChild, onEdit,
             </div>
 
             {hasChildren && isOpen && (
-                <ul>
+                <ul className="divide-y divide-border dark:divide-border-dark">
                     {children.map((child) => (
                         <TaskRow
                             key={child.id}
