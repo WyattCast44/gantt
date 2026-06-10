@@ -4,6 +4,7 @@ import Input from '@/components/ui/input';
 import InputError from '@/components/ui/input-error';
 import Select from '@/components/ui/select';
 import Textarea from '@/components/ui/textarea';
+import TaskScheduleFields, { inferScheduleMode, type ScheduleMode } from '@/Pages/Tasks/Partials/TaskScheduleFields';
 import { store as taskStore, update as taskUpdate } from '@/routes/projects/tasks';
 import {
     CLASSIFICATIONS,
@@ -15,10 +16,10 @@ import {
     type Task,
     type TaskStatusValue,
 } from '@/types';
-import { formatLongDateFromInput, todayInputDate } from '@/utils/date';
-import { DURATION_UNITS, resolveWorkCalendar, taskEndDate, type DurationUnitValue } from '@/utils/schedule';
+import { todayInputDate } from '@/utils/date';
+import { resolveWorkCalendar, taskDurationFromDates, taskEndDate, type DurationUnitValue } from '@/utils/schedule';
 import { useForm } from '@inertiajs/react';
-import { type FormEvent, useMemo } from 'react';
+import { type FormEvent, useMemo, useState } from 'react';
 
 type TaskFormData = {
     name: string;
@@ -52,7 +53,16 @@ type TaskFormProps = {
     onCancel?: () => void;
 };
 
-export default function TaskForm({ project, task, parents = [], defaultParentId = null, options, cancelHref, onSuccess, onCancel }: TaskFormProps) {
+export default function TaskForm({
+    project,
+    task,
+    parents = [],
+    defaultParentId = null,
+    options,
+    cancelHref,
+    onSuccess,
+    onCancel,
+}: TaskFormProps) {
     const editing = task !== undefined;
 
     const form = useForm<TaskFormData>({
@@ -72,30 +82,54 @@ export default function TaskForm({ project, task, parents = [], defaultParentId 
     });
 
     const workCalendar = useMemo(() => resolveWorkCalendar(project), [project]);
+    const [scheduleMode, setScheduleMode] = useState<ScheduleMode>(() => inferScheduleMode(task?.is_date_locked ?? true));
+    const [endDate, setEndDate] = useState(() => {
+        if (task?.end_date !== null && task?.end_date !== undefined) {
+            return task.end_date;
+        }
 
-    const calculatedEndDate = useMemo(
-        () => taskEndDate(form.data.start_date, form.data.duration_days, form.data.duration_unit, workCalendar),
-        [form.data.start_date, form.data.duration_days, form.data.duration_unit, workCalendar],
-    );
+        const start = task?.start_date ?? todayInputDate();
+        const duration = task?.duration_days ?? 1;
+        const unit = task?.duration_unit.value ?? 'work_days';
 
-    const formattedEndDate = useMemo(
-        () => (calculatedEndDate ? formatLongDateFromInput(calculatedEndDate) : null),
-        [calculatedEndDate],
-    );
+        return taskEndDate(start, duration, unit, resolveWorkCalendar(project)) ?? '';
+    });
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
 
         // Tags are entered as a comma-separated string; send an array, and drop
         // empty entries. start_date / parent_id are normalized to null when blank.
-        form.transform((data) => ({
-            ...data,
-            start_date: data.start_date === '' ? null : data.start_date,
-            tags: data.tags
-                .split(',')
-                .map((tag) => tag.trim())
-                .filter((tag) => tag !== ''),
-        }));
+        form.transform((data) => {
+            let durationDays = data.duration_days;
+            let isDateLocked = data.is_date_locked;
+
+            if (scheduleMode === 'start_end') {
+                const derived = taskDurationFromDates(data.start_date, endDate, data.duration_unit, workCalendar);
+
+                if (derived !== null) {
+                    durationDays = derived;
+                }
+
+                isDateLocked = true;
+            } else if (scheduleMode === 'fixed_duration') {
+                isDateLocked = false;
+            } else {
+                isDateLocked = true;
+            }
+
+            return {
+                ...data,
+                duration_days: durationDays,
+                is_date_locked: isDateLocked,
+                percent_complete: editing ? task.percent_complete : data.percent_complete,
+                start_date: data.start_date === '' ? null : data.start_date,
+                tags: data.tags
+                    .split(',')
+                    .map((tag) => tag.trim())
+                    .filter((tag) => tag !== ''),
+            };
+        });
 
         if (editing) {
             form.patch(taskUpdate.url([project.id, task.id]), { onSuccess });
@@ -159,75 +193,24 @@ export default function TaskForm({ project, task, parents = [], defaultParentId 
                     </FieldRow>
                 )}
 
-                <FieldRow label="Start date" htmlFor="task-start">
-                    <Input
-                        id="task-start"
-                        type="date"
-                        value={form.data.start_date}
-                        onChange={(event) => form.setData('start_date', event.target.value)}
-                    />
-                    <InputError message={form.errors.start_date} className="mt-1" />
-                </FieldRow>
-
-                <FieldRow label="Duration" htmlFor="task-duration" required>
-                    <div className="grid grid-cols-[minmax(5rem,1fr)_auto]">
-                        <Input
-                            id="task-duration"
-                            type="number"
-                            min={1}
-                            value={form.data.duration_days}
-                            onChange={(event) => form.setData('duration_days', Number(event.target.value))}
-                            required
-                            className="rounded-r-none border-r-0"
-                        />
-                        <Select
-                            id="task-duration-unit"
-                            value={form.data.duration_unit}
-                            onChange={(event) => form.setData('duration_unit', event.target.value as DurationUnitValue)}
-                            aria-label="Duration unit"
-                            className="w-[9.75rem] rounded-l-none"
-                        >
-                            {DURATION_UNITS.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </Select>
-                    </div>
-                    <InputError message={form.errors.duration_days ?? form.errors.duration_unit} className="mt-1" />
-                </FieldRow>
-
-                <FieldRow label="End date" htmlFor="task-end">
-                    <Input
-                        id="task-end"
-                        type="text"
-                        disabled
-                        readOnly
-                        value={formattedEndDate ?? ''}
-                        placeholder="—"
-                        className="cursor-not-allowed opacity-60"
-                        aria-describedby={formattedEndDate ? undefined : 'task-end-help'}
-                    />
-                    {!formattedEndDate && (
-                        <p id="task-end-help" className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
-                            Set a start date to calculate the end date.
-                        </p>
-                    )}
-                </FieldRow>
-
-                <FieldRow label="Date lock" htmlFor="task-lock">
-                    <label className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-neutral-300">
-                        <input
-                            id="task-lock"
-                            type="checkbox"
-                            checked={form.data.is_date_locked}
-                            onChange={(event) => form.setData('is_date_locked', event.target.checked)}
-                            className="h-4 w-4 rounded-none border-border accent-accent dark:border-border-dark"
-                        />
-                        Protect these dates from future schedule propagation
-                    </label>
-                    <InputError message={form.errors.is_date_locked} className="mt-1" />
-                </FieldRow>
+                <TaskScheduleFields
+                    mode={scheduleMode}
+                    onModeChange={setScheduleMode}
+                    startDate={form.data.start_date}
+                    onStartDateChange={(value) => form.setData('start_date', value)}
+                    endDate={endDate}
+                    onEndDateChange={setEndDate}
+                    durationDays={form.data.duration_days}
+                    onDurationDaysChange={(value) => form.setData('duration_days', value)}
+                    durationUnit={form.data.duration_unit}
+                    onDurationUnitChange={(value) => form.setData('duration_unit', value)}
+                    workCalendar={workCalendar}
+                    errors={{
+                        start_date: form.errors.start_date,
+                        duration_days: form.errors.duration_days,
+                        duration_unit: form.errors.duration_unit,
+                    }}
+                />
 
                 <FieldRow label="Status" htmlFor="task-status" required>
                     <Select id="task-status" value={form.data.status} onChange={(event) => form.setData('status', event.target.value as TaskStatusValue)}>
@@ -251,16 +234,25 @@ export default function TaskForm({ project, task, parents = [], defaultParentId 
                     <InputError message={form.errors.risk_level} className="mt-1" />
                 </FieldRow>
 
-                <FieldRow label="Percent complete" htmlFor="task-percent" required>
-                    <Input
-                        id="task-percent"
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={form.data.percent_complete}
-                        onChange={(event) => form.setData('percent_complete', Number(event.target.value))}
-                        required
-                    />
+                <FieldRow label="Percent complete" htmlFor={editing ? undefined : 'task-percent'} required={!editing}>
+                    {editing ? (
+                        <div data-testid="task-percent-readonly">
+                            <p className="text-sm text-slate-900 dark:text-white">{task.percent_complete}%</p>
+                            <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
+                                Use Update progress in the task header to change this value.
+                            </p>
+                        </div>
+                    ) : (
+                        <Input
+                            id="task-percent"
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={form.data.percent_complete}
+                            onChange={(event) => form.setData('percent_complete', Number(event.target.value))}
+                            required
+                        />
+                    )}
                     <InputError message={form.errors.percent_complete} className="mt-1" />
                 </FieldRow>
 

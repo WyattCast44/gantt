@@ -1,7 +1,7 @@
 import PageHeader from '@/components/ui/page-header';
 import TaskForm from '@/Pages/Tasks/Partials/TaskForm';
 import AppLayout from '@/layouts/app-layout';
-import { index as tasksIndex } from '@/routes/projects/tasks';
+import { index as tasksIndex, show as taskShow } from '@/routes/projects/tasks';
 import { type BaseClassificationValue, type Project, type Task } from '@/types';
 import { allowedClassifications } from '@/utils/classification';
 import { useMemo } from 'react';
@@ -30,7 +30,11 @@ export default function Create({
                     parents={parents}
                     defaultParentId={defaultParentId}
                     options={options}
-                    cancelHref={tasksIndex.url(project.id)}
+                    cancelHref={
+                        defaultParentId !== null
+                            ? taskShow.url([project.id, defaultParentId])
+                            : tasksIndex.url(project.id)
+                    }
                 />
             </div>
         </AppLayout>

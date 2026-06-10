@@ -16,6 +16,9 @@ test('the task edit tab renders without javascript errors', function () {
 
     visit("/projects/{$project->id}/tasks/{$task->id}?tab=edit")
         ->assertSee('Edit')
+        ->assertSee('Schedule by')
+        ->assertPresent('[data-testid=task-percent-readonly]')
+        ->assertNotPresent('#task-percent')
         ->assertSee('Save changes')
         ->assertNoJavascriptErrors();
 });
@@ -27,6 +30,8 @@ test('the task create page renders without javascript errors', function () {
 
     visit("/projects/{$project->id}/tasks/create")
         ->assertSee('New task')
+        ->assertSee('Schedule by')
+        ->assertSee('Start + duration')
         ->assertSee('Create task')
         ->assertNoJavascriptErrors();
 });
@@ -84,6 +89,34 @@ test('the task detail page lists its subtasks', function () {
     visit("/projects/{$project->id}/tasks/{$parent->id}")
         ->assertSee('Subtasks')
         ->assertSee('Sensor Integration')
+        ->assertSee('Add subtask')
+        ->assertNoJavascriptErrors();
+});
+
+test('the task detail page offers to add subtasks when none exist yet', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $task = Task::factory()->forProject($project)->create(['name' => 'EO Calibration']);
+    actingAs($owner);
+
+    visit("/projects/{$project->id}/tasks/{$task->id}")
+        ->assertSee('No subtasks yet')
+        ->assertSee('Add subtask')
+        ->assertNoJavascriptErrors();
+});
+
+test('the task detail page hides add subtask affordances at max depth', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $task = Task::factory()->forProject($project)->create([
+        'name' => 'Leaf task',
+        'hierarchy_level' => 5,
+    ]);
+    actingAs($owner);
+
+    visit("/projects/{$project->id}/tasks/{$task->id}")
+        ->assertDontSee('Add subtask')
+        ->assertDontSee('Subtasks')
         ->assertNoJavascriptErrors();
 });
 

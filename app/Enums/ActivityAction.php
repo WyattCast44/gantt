@@ -19,4 +19,5 @@ enum ActivityAction: string
     case Detached = 'detached';
     case DependencyAdded = 'dependency_added';
     case DependencyRemoved = 'dependency_removed';
+    case Reordered = 'reordered';
 }

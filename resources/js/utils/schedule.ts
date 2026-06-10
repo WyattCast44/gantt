@@ -81,3 +81,80 @@ export function taskEndDate(
 
     return formatInputDate(current);
 }
+
+/**
+ * Derive the inclusive start date when duration and end are known (inverse of
+ * {@link taskEndDate}).
+ */
+export function taskStartDate(
+    endDate: string,
+    durationDays: number,
+    unit: DurationUnitValue,
+    calendar: WorkCalendar,
+): string | null {
+    const end = parseInputDate(endDate);
+
+    if (end === null || durationDays < 1) {
+        return null;
+    }
+
+    if (unit === 'calendar_days') {
+        const start = new Date(end);
+        start.setDate(start.getDate() - (durationDays - 1));
+
+        return formatInputDate(start);
+    }
+
+    let current = new Date(end);
+    let counted = 0;
+
+    while (counted < durationDays) {
+        if (isWorkingDay(current, calendar)) {
+            counted++;
+
+            if (counted === durationDays) {
+                return formatInputDate(current);
+            }
+        }
+
+        current.setDate(current.getDate() - 1);
+    }
+
+    return formatInputDate(current);
+}
+
+/**
+ * Derive inclusive duration from a start/end pair (inverse of {@link taskEndDate}).
+ */
+export function taskDurationFromDates(
+    startDate: string,
+    endDate: string,
+    unit: DurationUnitValue,
+    calendar: WorkCalendar,
+): number | null {
+    const start = parseInputDate(startDate);
+    const end = parseInputDate(endDate);
+
+    if (start === null || end === null || end < start) {
+        return null;
+    }
+
+    if (unit === 'calendar_days') {
+        const difference = Math.round((end.getTime() - start.getTime()) / 86_400_000);
+
+        return difference + 1;
+    }
+
+    let count = 0;
+    const current = new Date(start);
+
+    while (current <= end) {
+        if (isWorkingDay(current, calendar)) {
+            count += 1;
+        }
+
+        current.setDate(current.getDate() + 1);
+    }
+
+    return count > 0 ? count : null;
+}

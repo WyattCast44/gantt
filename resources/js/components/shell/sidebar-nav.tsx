@@ -5,6 +5,7 @@ import {
     index as projectsIndex,
     settings as projectSettings,
     show as projectShow,
+    timeline as projectTimeline,
 } from '@/routes/projects';
 import { index as documentsIndex } from '@/routes/projects/documents';
 import { index as tasksIndex } from '@/routes/projects/tasks';
@@ -55,6 +56,7 @@ function globalItems(current: string): NavLink[] {
 
 function projectItems(project: Project, current: string): NavLink[] {
     const overviewUrl = projectShow.url(project.id);
+    const timelineUrl = projectTimeline.url(project.id);
     const tasksUrl = tasksIndex.url(project.id);
     const documentsUrl = documentsIndex.url(project.id);
     const settingsUrl = projectSettings.url(project.id);
@@ -62,7 +64,7 @@ function projectItems(project: Project, current: string): NavLink[] {
 
     const items: NavLink[] = [
         { key: 'overview', label: 'Overview', icon: LayoutGrid, href: overviewUrl, active: current === overviewUrl },
-        { key: 'timeline', label: 'Timeline', icon: GanttChartSquare, disabled: true },
+        { key: 'timeline', label: 'Timeline', icon: GanttChartSquare, href: timelineUrl, active: current.startsWith(timelineUrl) },
         { key: 'tasks', label: 'Tasks', icon: ListTree, href: tasksUrl, active: current.startsWith(tasksUrl) },
         { key: 'documents', label: 'Documents', icon: FileText, href: documentsUrl, active: current.startsWith(documentsUrl) },
     ];

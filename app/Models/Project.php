@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 
 #[Fillable(['owner_id', 'name', 'description', 'start_date', 'end_date', 'status', 'base_classification', 'special_access_required', 'handling_caveats', 'programs'])]
 class Project extends Model
@@ -58,6 +59,12 @@ class Project extends Model
      */
     protected static function booted(): void
     {
+        static::creating(function (Project $project): void {
+            if ($project->start_date === null) {
+                $project->start_date = today();
+            }
+        });
+
         static::created(function (Project $project): void {
             $project->members()->syncWithoutDetaching([
                 $project->owner_id => ['role' => Role::Owner->value],
@@ -117,6 +124,29 @@ class Project extends Model
     public function tasks(): HasMany
     {
         return $this->hasMany(Task::class);
+    }
+
+    /**
+     * Load the project's tasks as a nested tree: root tasks with the recursive
+     * `children` relation set at every tier, assembled from one query. Cheap at
+     * the V1 scale cap (< 1,000 tasks), and shared by the task index and the
+     * Gantt timeline so both feed off identical nested TaskResource arrays.
+     * The timeline additionally eager-loads `predecessors` to draw dependency
+     * lines; the index keeps the lighter default.
+     *
+     * @param  array<int, string>  $with
+     * @return Collection<int, Task>
+     */
+    public function taskTree(array $with = ['creator']): Collection
+    {
+        $tasks = $this->tasks()->with($with)->ordered()->get();
+        $byParent = $tasks->groupBy('parent_id');
+
+        $tasks->each(function (Task $task) use ($byParent): void {
+            $task->setRelation('children', $byParent->get($task->id, $task->newCollection())->values());
+        });
+
+        return $tasks->whereNull('parent_id')->values();
     }
 
     /**

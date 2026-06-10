@@ -24,6 +24,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
+use Spatie\EloquentSortable\Sortable;
+use Spatie\EloquentSortable\SortableTrait;
 
 /**
  * Only user-editable fields are mass-assignable; structural fields (project_id,
@@ -44,15 +46,27 @@ use Illuminate\Support\Facades\DB;
     'tags',
     'base_classification',
 ])]
-class Task extends Model
+class Task extends Model implements Sortable
 {
     /** @use HasFactory<TaskFactory> */
-    use HasClassification, HasFactory, HasUserStamps, LogsModelActivity, SoftDeletes;
+    use HasClassification, HasFactory, HasUserStamps, LogsModelActivity, SoftDeletes, SortableTrait;
 
     /**
      * The maximum hierarchy depth (PRD V1 decision: five tiers).
      */
     public const int MAX_DEPTH = 5;
+
+    /**
+     * Sortable config: order on `sort_order`. Creation order is set explicitly
+     * by the controller, so the package does not auto-order on create. Ordering
+     * is sibling-relative via {@see buildSortQuery()}.
+     *
+     * @var array<string, mixed>
+     */
+    public array $sortable = [
+        'order_column_name' => 'sort_order',
+        'sort_when_creating' => false,
+    ];
 
     /**
      * Get the attributes that should be cast.
@@ -198,6 +212,19 @@ class Task extends Model
     public function scopeOrdered(Builder $query): void
     {
         $query->orderBy('sort_order');
+    }
+
+    /**
+     * Restrict sortable neighbour logic to this task's sibling group (same
+     * project and parent), so reordering is sibling-relative.
+     *
+     * @return Builder<Task>
+     */
+    public function buildSortQuery(): Builder
+    {
+        return static::query()
+            ->where('project_id', $this->project_id)
+            ->where('parent_id', $this->parent_id);
     }
 
     /**

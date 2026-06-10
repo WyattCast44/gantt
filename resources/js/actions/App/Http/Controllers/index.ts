@@ -7,7 +7,10 @@ import DocumentController from './DocumentController'
 import DownloadDocumentController from './DownloadDocumentController'
 import PreviewDocumentController from './PreviewDocumentController'
 import CommentController from './CommentController'
+import TimelineController from './TimelineController'
 import TaskController from './TaskController'
+import ReorderTasksController from './ReorderTasksController'
+import RescheduleTaskController from './RescheduleTaskController'
 import CompleteTaskController from './CompleteTaskController'
 import TaskCommentController from './TaskCommentController'
 import TaskDependencyController from './TaskDependencyController'
@@ -29,7 +32,10 @@ const Controllers = {
     DownloadDocumentController: Object.assign(DownloadDocumentController, DownloadDocumentController),
     PreviewDocumentController: Object.assign(PreviewDocumentController, PreviewDocumentController),
     CommentController: Object.assign(CommentController, CommentController),
+    TimelineController: Object.assign(TimelineController, TimelineController),
     TaskController: Object.assign(TaskController, TaskController),
+    ReorderTasksController: Object.assign(ReorderTasksController, ReorderTasksController),
+    RescheduleTaskController: Object.assign(RescheduleTaskController, RescheduleTaskController),
     CompleteTaskController: Object.assign(CompleteTaskController, CompleteTaskController),
     TaskCommentController: Object.assign(TaskCommentController, TaskCommentController),
     TaskDependencyController: Object.assign(TaskDependencyController, TaskDependencyController),

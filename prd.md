@@ -2,7 +2,7 @@
 
 Operational Test Timeline & Dependency Management Platform
 
-_Version 12 - Phases 1–6 Implemented (Architecture, Auth & RBAC, Project Topologies + Workspace Shell + Membership, Document Ingestion, Polymorphic Commenting, Activity-Logging Foundation, Task Core Lifecycle + Temporal Logic + Domain Event Bus + Dependencies)_
+_Version 13 - Phases 1–7 Implemented (Architecture, Auth & RBAC, Project Topologies + Workspace Shell + Membership, Document Ingestion, Polymorphic Commenting, Activity-Logging Foundation, Task Core Lifecycle + Temporal Logic + Domain Event Bus + Dependencies, UI Design System + Gantt State Engine). Phase 7 additionally delivered the interactive Gantt timeline with drag-to-reschedule, dependency lines, infinite horizontal scroll, a today marker, sibling reordering (drag + buttons via spatie/eloquent-sortable), and workday-aware scheduling (work-day vs calendar-day durations)._
 
 # Overview
 
@@ -693,9 +693,9 @@ Deploy the polymorphic comment schema and hook threads onto Document first to pr
 
 Build atomic CRUD for the 5-tier recursive Task structure. Per C5 (no service layer), `start_date`/`duration_days` logic lives on the `Task` model (domain methods + scopes) with controllers staying thin; keep MVP logic simple (manual locking first) before layering in cascading propagation. Dispatch domain events (TaskCreated, TaskUpdated) on create/update and register simple immediate listeners for internal state and system logging — this is where the generic event/listener foundation (deferred in Phase 3) gets built. **\[ACTIVITY-LOG NOTE\]** The append-only audit trail (PRD §9) is already built (see the Activity-Logging Foundation status section below); Task picks it up simply by adding `use LogsModelActivity;`. Note the audit trail is captured via Eloquent model events (Spatie), independent of the generic domain-event bus Phase 6 still introduces — the two are complementary, not the same mechanism.
 
-### Phase 7 - UI Design System & Gantt State Engine
+### Phase 7 - UI Design System & Gantt State Engine — ✅ COMPLETED
 
-Lock the component rules - button variants, typography scale, responsive layout wrappers - then build the deterministic Zustand-based viewport store with row virtualization that drives five-level Gantt visibility, designed so date propagation can later mutate bar positions through the same engine.
+Locked the component rules and built the deterministic Zustand-based viewport store with row virtualization driving five-level Gantt visibility, designed so date propagation can later mutate bar positions through the same engine. Delivered: the `projects.timeline` page; the pure layout/axis/geometry engine; a three-tier zoom-adaptive axis (day/month/quarter/year) with weekend shading and a today marker; drag-to-reschedule (auto-unlocks), dependency connector lines (FR-3), sibling reordering via drag **and** buttons (`spatie/eloquent-sortable`), infinite horizontal scroll with header panning and prev/next/Today controls + keyboard hotkeys; and **workday-aware scheduling** (work-day vs calendar-day durations, FR-5). Baselines (FR-17) and screenshot export (FR-8) remain deferred. See "Implementation Status & Established Conventions (through Phase 7)".
 
 ### Future Phase - Notification Engine Deployment
 
@@ -944,6 +944,40 @@ This section records what Phase 6 added on top of the Phase 1–5 + Activity-Log
 
 ## Phase 7 Starting Point
 Task CRUD, the recursive tree, temporal logic, dependencies (both directions), comments, document attachments, task completion, audit (including dependency/attachment actions), and the generic event bus are all in place — delivering the clean nested task arrays (TaskResource) the A11 Gantt engine consumes. Phase 7 (UI Design System & Gantt State Engine) layers the deterministic Zustand viewport store + row virtualization on top, designed so date propagation can later mutate bar positions through the same engine. Drag-reorder/move-parent, workday-aware `endDate()`, and the notification-delivery listeners (on the Phase 6 bus) remain future work.
+
+# Implementation Status & Established Conventions (through Phase 7)
+
+This section records what Phase 7 added on top of the Phase 1–6 + Activity-Logging foundation. Phases 1–7 are complete and fully tested (262 tests passing at the time of writing). Phase 7 was built incrementally (7.0–7.7) and then extended with several follow-on enhancements (workday-aware scheduling, axis polish, a today marker, navigation controls, and task reordering).
+
+## Product decisions (Phase 7)
+- **Gantt is the timeline surface:** a dedicated `projects.timeline` page (sidebar "Timeline" item), separate from the `Tasks/Index` tree. Both consume identical nested `TaskResource` arrays via `Project::taskTree()`.
+- **Deterministic, externally-managed viewport (A11):** all layout (visible-row list + integer-pixel coordinates) is computed in a Zustand store outside the React render loop; components are purely presentational and read the precomputed `layout`.
+- **Zoom-adaptive level of detail (FR-15):** day / month / quarter / year. Zooming out folds deeper hierarchy tiers (`ZOOM_CONFIG[zoom].maxDepth` = 5/4/3/2) and switches the axis calendar units.
+- **Drag-to-reschedule:** dragging a bar body moves `start_date`; dragging the right edge changes `duration_days`; both snap to whole days. Dragging a task **auto-unlocks** it (`is_date_locked = false`) — the user is taking explicit manual control (resolves the default-locked-on-create tension). Editors+ only.
+- **Workday-aware scheduling (FR-5) — now implemented:** tasks carry a `duration_unit` (`work_days` default / `calendar_days`); `Task::endDate()` derives the inclusive end via a project `WorkCalendar` (weekends excluded by default). This realises the workday-aware §5/FR-5 requirement that Phase 6 had stubbed as calendar-day-only. Custom holidays / per-project calendar settings remain a future enhancement (the calendar is currently the Sat/Sun default).
+- **Sibling reordering:** tasks can be reordered among their siblings (same `parent_id`, project-scoped) by **drag** (a row grip handle with a drop indicator) **or** up/down **buttons**, backed by `spatie/eloquent-sortable`. Reparenting / move-to-different-parent is **not** in scope (still deferred).
+- **Deferred (still future work):** schedule baselines & comparison (FR-17/§14), screenshot export (FR-8), automatic date propagation, reparenting, and the notification-delivery layer.
+
+## Backend (Phase 7)
+- **`TimelineController`** (invokable) → `Inertia::render('Timeline/Show')` with `ProjectResource` + `TaskResource::collection($project->taskTree(['creator', 'predecessors']))`. `Project::taskTree(array $with = ['creator'])` is the shared one-query nested-tree builder (also used by `TaskController@index`; the timeline additionally eager-loads `predecessors` for the dependency lines).
+- **Workday calendar (`app/Support`):** `WorkCalendar` (non-working weekdays, JS-compatible `0=Sun…6=Sat`; `default()` = Sat/Sun; `isWorkingDay()`, `endDateForWorkDays()`) and `Schedule::endDate(start, durationDays, DurationUnit, WorkCalendar)`. `Project::workCalendar()` returns the default for now and is exposed on `ProjectResource` as `work_calendar`. `DurationUnit` enum (`calendar_days` / `work_days`, `label()`); added to the `tasks` table via the `add_duration_unit_to_tasks_table` migration and to `Task` `#[Fillable]`/casts; `TaskResource` exposes `duration_unit` as `{value,label}`.
+- **Reschedule:** invokable `RescheduleTaskController` + `RescheduleTaskRequest`; route `projects.tasks.reschedule` (PATCH). Sets `start_date`/`duration_days`, clears `is_date_locked`, dispatches `TaskUpdated`, redirects `back()` (so the timeline reloads in place rather than navigating to the task detail page — the generic `update` action still redirects to `show`).
+- **Reorder:** `Task` implements `Spatie\EloquentSortable\Sortable` (`SortableTrait`, `$sortable` on `sort_order`, `sort_when_creating = false`); `buildSortQuery()` scopes neighbours to `project_id` + `parent_id` (sibling-relative). Invokable `ReorderTasksController` + `ReorderTaskRequest` (route `projects.tasks.reorder`, PATCH, declared **before** the `/tasks/{task}` routes to avoid param capture). The request guards that `ordered_ids` is **exactly** the sibling group (rejects foreign/missing/partial sets); the controller calls `Task::setNewOrder()` in a transaction and records an `ActivityAction::Reordered` audit entry on the parent task (or the project for root-level reorders). No `TaskUpdated` (nothing schedule/content changed).
+- **`ActivityAction`** gained `Reordered`. Arch allowlist unchanged (the new controllers use only already-permitted layers).
+
+## Frontend (Phase 7)
+- **State engine (`stores/useGanttStore.ts`, Zustand):** holds `tasks`, `zoom`, `collapsed`, `viewportWidth`, an **extendable** `rangeStart`/`rangeEnd`, and `anchorToken`/`anchorScroll`; recomputes `layout` eagerly in each action. Actions: `init`, `setTasks`, `setZoom`, `setViewportWidth`, `extendRangeStart`/`extendRangeEnd` (infinite scroll), `goToWeek` (Today/jump), `reorderSiblings` (optimistic), `toggleCollapse`/`expandAll`/`collapseAll`.
+- **Pure modules:** `utils/gantt.ts` (integer-pixel geometry constants + date↔pixel helpers incl. `addDays`/`startOfWeek`/`endOfWeek`), `utils/ganttLayout.ts` (`computeLayout` → flat rows with `siblingIds`, `computeRange`, `reorderTree`, `collectParentIds`), `utils/ganttAxis.ts` (three-tier `buildAxis`: primary/secondary/tertiary bands with day/weekday/month/quarter/**fiscal-year** units, weekend flags), and `utils/date.ts`.
+- **Components (`Pages/Timeline/`):** `Show.tsx` (full-bleed page + store sync + empty state with a "New task" CTA), `GanttChart.tsx` (single scroll container; sticky three-tier axis header; sticky-left virtualized tree pane via `@tanstack/react-virtual`; toolbar with prev/Today/next, expand/collapse-all, zoom control), and partials `TimelineAxis`, `TaskBar`, `TaskBarTooltip`, `DependencyLayer` (FtS connector SVG), `WeekendBands`, `TodayLine` (dotted red current-day marker), `ZoomControl`, plus `barAppearance.ts`. Custom-pointer hooks: `useGanttDrag` (reschedule), `useGanttReorder` (sibling drag), and header click-drag panning — no DnD/gesture dependency.
+- **Interactions:** infinite horizontal scroll (range grows near either edge, left-extension compensated so there is no jump); header drag-to-pan; prev/next/Today buttons; keyboard hotkeys (`d/m/q/y` zoom, `t` Today). Bars show status fill, percent-complete, risk stripe, organization tag, and a manual-lock icon. Reorder shows a grip handle + drop indicator and up/down buttons (editors only).
+- **New dependencies:** `zustand`, `@tanstack/react-virtual` (frontend); `spatie/eloquent-sortable` (backend).
+- **Layout primitive:** `layouts/app-layout` gained a `fullBleed` mode so the Gantt fills the viewport (no centered max-width column).
+
+## Seeders
+- **`TaskSeeder`** seeds a realistic multi-tier operational-test campaign (the "F-35 Block 4 Operational Test Campaign") into a project — five phases, three levels deep (~21 tasks), staggered dates straddling today, varied status/risk/organization/tags, finish-to-start dependencies, and a couple of unlocked tasks for drag demos. Runs standalone or is driven by `DatabaseSeeder` (which also creates the `test@example.com` user and a few extra projects for index/switcher variety).
+
+## Next-phase starting point
+The interactive Gantt is complete and feeds off the existing `TaskResource`. Remaining V1-scope work not yet built: **schedule baselines & comparison (FR-17)** — which pairs naturally with the timeline (slippage overlays) — and **screenshot export (FR-8)**. The roadmap's next named phase is **Notification Engine Deployment**, built on the Phase 6 event bus. Automatic date propagation, reparenting, and per-project calendar/holiday settings remain documented post-MVP enhancements.
 
 # Architecture Issues - Resolved
 

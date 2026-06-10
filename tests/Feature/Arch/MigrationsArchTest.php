@@ -15,8 +15,15 @@ arch('migrations use user stamps', function () {
     foreach ($migrations as $migration) {
         $contents = file_get_contents($migration);
 
-        expect(str_contains($contents, '->userStamps()'))->toBeTrue();
-        expect(str_contains($contents, '->softDeletesWithUserStamps()'))->toBeTrue();
+        // The raw ->timestamps() macro is forbidden everywhere (audit stamps
+        // replace it). The user-stamp macros only apply to table-creating
+        // migrations; alter migrations (Schema::table) legitimately add columns
+        // to an already-stamped table.
         expect(str_contains($contents, '->timestamps()'))->toBeFalse();
+
+        if (str_contains($contents, 'Schema::create(')) {
+            expect(str_contains($contents, '->userStamps()'))->toBeTrue();
+            expect(str_contains($contents, '->softDeletesWithUserStamps()'))->toBeTrue();
+        }
     }
 });

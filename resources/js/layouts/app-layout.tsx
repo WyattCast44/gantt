@@ -11,9 +11,15 @@ type AppLayoutProps = PropsWithChildren<{
     title: string;
     /** When inside a project workspace, drives the project-scoped sidebar + search. */
     project?: Project;
+    /**
+     * Render the page edge-to-edge with no centered container or padding, and
+     * let the page own its internal scrolling/height (the Gantt timeline fills
+     * the viewport rather than scrolling within a max-width column).
+     */
+    fullBleed?: boolean;
 }>;
 
-export default function AppLayout({ title, project, children }: AppLayoutProps) {
+export default function AppLayout({ title, project, fullBleed = false, children }: AppLayoutProps) {
     return (
         <div className="flex h-screen flex-col bg-neutral-100 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
             <Head title={title} />
@@ -31,9 +37,13 @@ export default function AppLayout({ title, project, children }: AppLayoutProps) 
                     </div>
                 </ResizableSidebar>
 
-                <main className="min-w-0 flex-1 overflow-auto">
-                    <div className="mx-auto max-w-6xl px-6 py-8">{children}</div>
-                </main>
+                {fullBleed ? (
+                    <main className="flex min-w-0 flex-1 flex-col overflow-hidden">{children}</main>
+                ) : (
+                    <main className="min-w-0 flex-1 overflow-auto">
+                        <div className="mx-auto max-w-6xl px-6 py-8">{children}</div>
+                    </main>
+                )}
             </div>
         </div>
     );

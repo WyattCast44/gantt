@@ -61,7 +61,6 @@ class ProjectController
         $project = Project::create([
             ...$request->validated(),
             'owner_id' => $request->user()->id,
-            'start_date' => today(),
         ]);
 
         return redirect()->route('projects.show', $project)

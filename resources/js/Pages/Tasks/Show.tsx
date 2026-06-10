@@ -1,7 +1,7 @@
 import ActivityLog from '@/components/activity-log';
 import CommentsThread from '@/components/comments-section';
 import Badge from '@/components/ui/badge';
-import Button, { buttonClasses } from '@/components/ui/button';
+import Button, { ButtonLink, buttonClasses } from '@/components/ui/button';
 import Card from '@/components/ui/card';
 import ConfirmDialog from '@/components/ui/confirm-dialog';
 import InputError from '@/components/ui/input-error';
@@ -15,15 +15,18 @@ import AppLayout from '@/layouts/app-layout';
 import { destroy as taskCommentDestroy, store as taskCommentStore, update as taskCommentUpdate } from '@/routes/projects/tasks/comments';
 import { destroy as dependencyDestroy, store as dependencyStore } from '@/routes/projects/tasks/dependencies';
 import { destroy as taskDocumentDestroy, store as taskDocumentStore, upload as taskDocumentUpload } from '@/routes/projects/tasks/documents';
-import { destroy as taskDestroy, complete as taskComplete, index as tasksIndex, show as taskShow } from '@/routes/projects/tasks';
+import { destroy as taskDestroy, complete as taskComplete, create as tasksCreate, index as tasksIndex, show as taskShow } from '@/routes/projects/tasks';
 import { type BaseClassificationValue, type Dependency, type Document, type Project, type Task } from '@/types';
 import { allowedClassifications } from '@/utils/classification';
 import { formatDateTime } from '@/utils/date';
 import { Link, useForm, usePage } from '@inertiajs/react';
-import { ArrowLeft, CheckCircle2, Download, GitBranch, History, Info, Lock, LockOpen, MessageSquare, Paperclip, Pencil, Trash2, Upload } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Download, GitBranch, History, Info, ListTree, Lock, LockOpen, MessageSquare, Paperclip, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { type FormEvent, type ReactNode, useMemo, useState } from 'react';
 
 type TabKey = 'details' | 'comments' | 'dependencies' | 'attachments' | 'history' | 'edit';
+
+/** Tasks deeper than this may not take children (PRD V1 cap of five tiers). */
+const MAX_DEPTH = 5;
 
 function useActiveTab(canEdit: boolean): TabKey {
     const page = usePage();
@@ -91,39 +94,62 @@ function ParentTaskCard({ project, task }: { project: Project; task: Task }) {
     );
 }
 
-function SubtasksCard({ project, task }: { project: Project; task: Task }) {
+function SubtasksCard({ project, task, canEdit }: { project: Project; task: Task; canEdit: boolean }) {
     const children = task.children ?? [];
+    const canHaveChildren = task.hierarchy_level < MAX_DEPTH;
+    const createSubtaskUrl = tasksCreate.url(project.id, { query: { parent_id: task.id } });
 
-    if (children.length === 0) {
+    if (! canHaveChildren && children.length === 0) {
         return null;
     }
 
     return (
         <Card padding="none" className="overflow-hidden">
-            <div className="border-b border-border px-4 py-2.5 text-xs font-medium text-slate-500 dark:border-border-dark dark:text-neutral-400">
-                Subtasks ({children.length})
+            <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5 dark:border-border-dark">
+                <div className="text-xs font-medium text-slate-500 dark:text-neutral-400">
+                    Subtasks{children.length > 0 ? ` (${children.length})` : ''}
+                </div>
+                {canEdit && canHaveChildren && (
+                    <ButtonLink href={createSubtaskUrl} variant="secondary" size="sm">
+                        <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                        Add subtask
+                    </ButtonLink>
+                )}
             </div>
-            <ul>
-                {children.map((child) => (
-                    <li
-                        key={child.id}
-                        className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 last:border-0 dark:border-border-dark"
-                    >
-                        <Link
-                            href={taskShow.url([project.id, child.id])}
-                            className="truncate text-sm text-slate-900 hover:text-accent-700 dark:text-white dark:hover:text-accent-300"
+            {children.length === 0 ? (
+                <div className="flex flex-col items-center gap-3 px-4 py-10 text-center">
+                    <ListTree className="h-8 w-8 text-slate-300 dark:text-neutral-600" aria-hidden />
+                    <p className="text-sm text-slate-600 dark:text-neutral-400">No subtasks yet.</p>
+                    {canEdit && canHaveChildren && (
+                        <ButtonLink href={createSubtaskUrl}>
+                            <Plus className="mr-2 h-4 w-4" aria-hidden />
+                            Add subtask
+                        </ButtonLink>
+                    )}
+                </div>
+            ) : (
+                <ul>
+                    {children.map((child) => (
+                        <li
+                            key={child.id}
+                            className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 last:border-0 dark:border-border-dark"
                         >
-                            {child.name}
-                        </Link>
-                        <div className="flex shrink-0 items-center gap-2">
-                            <Badge tone={statusTone(child.status.value)}>{child.status.label}</Badge>
-                            <span className="w-10 text-right text-xs text-slate-500 tabular-nums dark:text-neutral-400">
-                                {child.percent_complete}%
-                            </span>
-                        </div>
-                    </li>
-                ))}
-            </ul>
+                            <Link
+                                href={taskShow.url([project.id, child.id])}
+                                className="truncate text-sm text-slate-900 hover:text-accent-700 dark:text-white dark:hover:text-accent-300"
+                            >
+                                {child.name}
+                            </Link>
+                            <div className="flex shrink-0 items-center gap-2">
+                                <Badge tone={statusTone(child.status.value)}>{child.status.label}</Badge>
+                                <span className="w-10 text-right text-xs text-slate-500 tabular-nums dark:text-neutral-400">
+                                    {child.percent_complete}%
+                                </span>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            )}
         </Card>
     );
 }
@@ -533,7 +559,7 @@ export default function Show({
                     </div>
 
                     {canEdit && (
-                        <div className="flex shrink-0 items-center gap-2">
+                        <div className="flex shrink-0 flex-wrap items-center gap-2">
                             <Button variant="secondary" onClick={() => setPercentOpen(true)}>
                                 Update progress
                             </Button>
@@ -554,7 +580,7 @@ export default function Show({
                         {tab === 'details' && (
                             <div className="flex flex-col gap-6">
                                 <ParentTaskCard project={project} task={task} />
-                                <SubtasksCard project={project} task={task} />
+                                <SubtasksCard project={project} task={task} canEdit={canEdit} />
                                 <DetailsPane task={task} />
                             </div>
                         )}

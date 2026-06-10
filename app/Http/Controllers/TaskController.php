@@ -31,22 +31,9 @@ class TaskController
      */
     public function index(Project $project): Response
     {
-        // One query for the whole project, assembled into a tree in memory so
-        // the recursive `children` relation is set at every tier (the resource
-        // serializes whenLoaded('children') down the tree). Cheap at the V1
-        // scale cap (< 1,000 tasks).
-        $tasks = $project->tasks()->with('creator')->ordered()->get();
-        $byParent = $tasks->groupBy('parent_id');
-
-        $tasks->each(function (Task $task) use ($byParent): void {
-            $task->setRelation('children', $byParent->get($task->id, $task->newCollection())->values());
-        });
-
-        $roots = $tasks->whereNull('parent_id')->values();
-
         return Inertia::render('Tasks/Index', [
             'project' => new ProjectResource($project),
-            'tasks' => TaskResource::collection($roots),
+            'tasks' => TaskResource::collection($project->taskTree()),
         ]);
     }
 
@@ -124,13 +111,7 @@ class TaskController
     {
         $parent = $request->parentTask();
 
-        $attributes = $request->safe()->except('parent_id');
-
-        if (($attributes['start_date'] ?? null) === null) {
-            $attributes['start_date'] = today();
-        }
-
-        $task = new Task($attributes);
+        $task = new Task($request->safe()->except('parent_id'));
 
         // Structural fields are derived server-side; they are not #[Fillable].
         $task->project_id = $project->id;

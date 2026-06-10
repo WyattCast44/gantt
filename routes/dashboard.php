@@ -14,6 +14,8 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectInvitationController;
 use App\Http\Controllers\ProjectMemberController;
 use App\Http\Controllers\ProjectSettingsController;
+use App\Http\Controllers\ReorderTasksController;
+use App\Http\Controllers\RescheduleTaskController;
 use App\Http\Controllers\RestoreProjectController;
 use App\Http\Controllers\SidebarCollapsedController;
 use App\Http\Controllers\SidebarWidthController;
@@ -21,6 +23,7 @@ use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskDependencyController;
 use App\Http\Controllers\TaskDocumentController;
+use App\Http\Controllers\TimelineController;
 use App\Http\Controllers\UploadTaskDocumentController;
 use Illuminate\Support\Facades\Route;
 
@@ -136,6 +139,10 @@ Route::delete('/projects/{project}/documents/{document}/comments/{comment}', [Co
     ->scopeBindings()
     ->name('projects.documents.comments.destroy');
 
+Route::get('/projects/{project}/timeline', TimelineController::class)
+    ->middleware('project.member')
+    ->name('projects.timeline');
+
 Route::get('/projects/{project}/tasks', [TaskController::class, 'index'])
     ->middleware('project.member')
     ->name('projects.tasks.index');
@@ -148,6 +155,11 @@ Route::post('/projects/{project}/tasks', [TaskController::class, 'store'])
     ->middleware('project.member')
     ->name('projects.tasks.store');
 
+// Declared before the /tasks/{task} routes so "reorder" is not captured as {task}.
+Route::patch('/projects/{project}/tasks/reorder', ReorderTasksController::class)
+    ->middleware('project.member')
+    ->name('projects.tasks.reorder');
+
 Route::get('/projects/{project}/tasks/{task}', [TaskController::class, 'show'])
     ->middleware('project.member')
     ->scopeBindings()
@@ -157,6 +169,11 @@ Route::patch('/projects/{project}/tasks/{task}', [TaskController::class, 'update
     ->middleware('project.member')
     ->scopeBindings()
     ->name('projects.tasks.update');
+
+Route::patch('/projects/{project}/tasks/{task}/reschedule', RescheduleTaskController::class)
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.tasks.reschedule');
 
 Route::post('/projects/{project}/tasks/{task}/complete', CompleteTaskController::class)
     ->middleware('project.member')

@@ -25,6 +25,17 @@ class StoreTaskRequest extends FormRequest
     }
 
     /**
+     * Default an unspecified start date to today so every task lands on the
+     * timeline (V1 manual dates; the user can adjust afterwards).
+     */
+    protected function prepareForValidation(): void
+    {
+        if (blank($this->input('start_date'))) {
+            $this->merge(['start_date' => today()->toDateString()]);
+        }
+    }
+
+    /**
      * @return array<string, array<int, mixed>>
      */
     public function rules(): array
