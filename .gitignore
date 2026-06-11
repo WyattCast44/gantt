@@ -33,3 +33,6 @@ resources/js/routes/
 resources/js/wayfinder/
 
 # reference files
+**/caddy
+frankenphp
+frankenphp-worker.php
