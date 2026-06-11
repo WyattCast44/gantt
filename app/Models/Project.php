@@ -4,12 +4,20 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\ActivityAction;
+use App\Enums\DurationUnit;
 use App\Enums\ProjectStatus;
 use App\Enums\Role;
+use App\Events\TaskUpdated;
 use App\Models\Concerns\HasClassification;
 use App\Models\Concerns\HasUserStamps;
 use App\Models\Concerns\LogsModelActivity;
+use App\Support\Propagation\PropagationResult;
+use App\Support\Propagation\ScheduleGraph;
+use App\Support\Propagation\SchedulePropagator;
+use App\Support\Propagation\TaskNode;
 use App\Support\WorkCalendar;
+use Carbon\CarbonImmutable;
 use Database\Factories\ProjectFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,6 +27,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 #[Fillable(['owner_id', 'name', 'description', 'start_date', 'end_date', 'status', 'base_classification', 'special_access_required', 'handling_caveats', 'programs'])]
 class Project extends Model
@@ -147,6 +156,120 @@ class Project extends Model
         });
 
         return $tasks->whereNull('parent_id')->values();
+    }
+
+    /**
+     * Build the in-memory schedule graph the rules engine runs against: every
+     * task as a TaskNode plus the finish-to-start edges, in two queries.
+     *
+     * @param  array<int, array<string, mixed>>  $overrides  Seed edits applied
+     *                                                       in-memory before propagation, keyed by task id (start_date,
+     *                                                       duration_days, duration_unit, lock flags).
+     * @param  list<array{0: int, 1: int}>  $extraEdges  Not-yet-attached
+     *                                                   [predecessor, successor] edges to preview.
+     */
+    public function scheduleGraph(array $overrides = [], array $extraEdges = []): ScheduleGraph
+    {
+        $nodes = [];
+
+        foreach ($this->tasks()->orderBy('id')->get() as $task) {
+            $values = array_merge($task->only([
+                'parent_id', 'name', 'start_date', 'duration_days', 'duration_unit',
+                'lock_start', 'lock_end', 'lock_duration',
+            ]), $overrides[$task->id] ?? []);
+
+            $start = $values['start_date'];
+
+            $nodes[$task->id] = new TaskNode(
+                id: $task->id,
+                parentId: $values['parent_id'],
+                name: $values['name'],
+                start: $start === null ? null : CarbonImmutable::parse((string) $start)->startOfDay(),
+                durationDays: (int) $values['duration_days'],
+                unit: $values['duration_unit'] instanceof DurationUnit
+                    ? $values['duration_unit']
+                    : DurationUnit::from((string) $values['duration_unit']),
+                lockStart: (bool) $values['lock_start'],
+                lockEnd: (bool) $values['lock_end'],
+                lockDuration: (bool) $values['lock_duration'],
+            );
+        }
+
+        $edges = DB::table('task_dependencies')
+            ->whereNull('deleted_at')
+            ->whereIn('successor_id', array_keys($nodes))
+            ->orderBy('id')
+            ->get(['predecessor_id', 'successor_id'])
+            ->map(fn (object $edge): array => [(int) $edge->predecessor_id, (int) $edge->successor_id])
+            ->all();
+
+        return new ScheduleGraph($nodes, array_merge($edges, $extraEdges), $this->workCalendar());
+    }
+
+    /**
+     * Dry-run the rules engine against the current schedule plus the given
+     * in-memory seed edits. Nothing is persisted.
+     *
+     * @param  array<int, array<string, mixed>>  $overrides
+     * @param  list<array{0: int, 1: int}>  $extraEdges
+     */
+    public function previewSchedule(array $overrides = [], array $extraEdges = []): PropagationResult
+    {
+        return SchedulePropagator::propagate($this->scheduleGraph($overrides, $extraEdges));
+    }
+
+    /**
+     * Persist the engine's cascade moves. Each moved task gets a single
+     * schedule_propagated audit entry attributing the cause (Spatie's
+     * attribute logger is disabled for the write so the trail isn't doubled)
+     * and dispatches TaskUpdated so the move rides the event bus. The seed
+     * task the user edited directly is persisted by its controller, not here.
+     */
+    public function commitSchedule(PropagationResult $result, Task $cause): void
+    {
+        $moves = $result->movesExcept($cause->id);
+
+        if ($moves === []) {
+            return;
+        }
+
+        DB::transaction(function () use ($moves, $cause): void {
+            $tasks = $this->tasks()->whereIn('id', array_keys($moves))->get()->keyBy('id');
+
+            foreach ($moves as $taskId => $move) {
+                $task = $tasks->get($taskId);
+
+                if ($task === null) {
+                    continue;
+                }
+
+                $attributes = [
+                    'start_date' => $move->toStart,
+                    'duration_days' => $move->toDuration,
+                ];
+
+                if ($move->unitChanged()) {
+                    $attributes['duration_unit'] = $move->toUnit;
+                }
+
+                $task->disableLogging();
+                $task->update($attributes);
+                $task->enableLogging();
+
+                $task->logAction(ActivityAction::SchedulePropagated, array_filter([
+                    'reason' => $move->reason,
+                    'caused_by_task_id' => $cause->id,
+                    'caused_by_task' => $cause->name,
+                    'pushed_by_task' => $move->causedByName,
+                    'old_start' => $move->fromStart,
+                    'new_start' => $move->toStart,
+                    'old_duration' => $move->fromDuration,
+                    'new_duration' => $move->toDuration,
+                ], fn (mixed $value): bool => $value !== null));
+
+                TaskUpdated::dispatch($task);
+            }
+        });
     }
 
     /**

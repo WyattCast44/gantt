@@ -29,7 +29,8 @@ function taskPayload(array $overrides = []): array
         'start_date' => '2026-01-01',
         'duration_days' => 5,
         'duration_unit' => DurationUnit::WorkDays->value,
-        'is_date_locked' => true,
+        'lock_start' => true,
+        'lock_duration' => true,
         'status' => TaskStatus::NotStarted->value,
         'percent_complete' => 0,
         'risk_level' => RiskLevel::Low->value,
@@ -51,8 +52,159 @@ test('an editor can create a top-level task', function () {
     expect($task->name)->toBe('EO Calibration')
         ->and($task->hierarchy_level)->toBe(1)
         ->and($task->parent_id)->toBeNull()
-        ->and($task->is_date_locked)->toBeTrue()
+        ->and($task->lock_start)->toBeTrue()
+        ->and($task->lock_duration)->toBeTrue()
+        ->and($task->lock_end)->toBeFalse()
         ->and($task->created_by)->toBe($editor->id);
+});
+
+test('locking all three schedule fields is rejected', function () {
+    $editor = User::factory()->create();
+    $project = Project::factory()->withMember($editor, Role::Editor)->create();
+
+    $this->actingAs($editor)->post(route('projects.tasks.store', $project), taskPayload([
+        'lock_start' => true,
+        'lock_end' => true,
+        'lock_duration' => true,
+    ]))->assertSessionHasErrors('lock_start');
+
+    expect($project->tasks()->count())->toBe(0);
+});
+
+test('the model refuses to save more than two schedule locks', function () {
+    $task = Task::factory()->create();
+
+    $task->lock_start = true;
+    $task->lock_end = true;
+    $task->lock_duration = true;
+
+    expect(fn () => $task->save())->toThrow(LogicException::class);
+});
+
+test('creating a child rolls the parent envelope up to cover it', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $parent = Task::factory()->forProject($project)->create([
+        'start_date' => '2026-03-02',
+        'duration_days' => 5,
+        'duration_unit' => DurationUnit::CalendarDays,
+    ]);
+
+    // First child: Mar 4 + 3cd (ends Mar 6). The parent stops being its own
+    // schedule and becomes the envelope of its subtree.
+    $this->actingAs($owner)->post(route('projects.tasks.store', $project), taskPayload([
+        'parent_id' => $parent->id,
+        'name' => 'Child A',
+        'start_date' => '2026-03-04',
+        'duration_days' => 3,
+        'duration_unit' => DurationUnit::CalendarDays->value,
+    ]))->assertRedirect();
+
+    $parent->refresh();
+
+    expect($parent->start_date->toDateString())->toBe('2026-03-04')
+        ->and($parent->endDate()->toDateString())->toBe('2026-03-06');
+
+    // A propagated roll-up is recorded in the parent's audit trail.
+    $activity = $parent->activitiesAsSubject()->where('event', 'schedule_propagated')->first();
+
+    expect($activity)->not->toBeNull()
+        ->and($activity->properties['reason'] ?? null)->toBe('rollup')
+        ->and($activity->properties['caused_by_task'] ?? null)->toBe('Child A');
+});
+
+test('deleting a child shrinks the parent envelope', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $parent = Task::factory()->forProject($project)->create();
+    $early = Task::factory()->forProject($project)->child($parent)->create([
+        'start_date' => '2026-03-02',
+        'duration_days' => 2,
+        'duration_unit' => DurationUnit::CalendarDays,
+    ]);
+    Task::factory()->forProject($project)->child($parent)->create([
+        'start_date' => '2026-03-10',
+        'duration_days' => 2,
+        'duration_unit' => DurationUnit::CalendarDays,
+    ]);
+
+    // Normalize the parent to the two-child envelope first.
+    $project->commitSchedule($project->previewSchedule(), $parent);
+
+    $this->actingAs($owner)->delete(route('projects.tasks.destroy', [$project, $early]))
+        ->assertRedirect();
+
+    $parent->refresh();
+
+    expect($parent->start_date->toDateString())->toBe('2026-03-10')
+        ->and($parent->endDate()->toDateString())->toBe('2026-03-11');
+});
+
+test('a parent task schedule cannot be edited directly', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $parent = Task::factory()->forProject($project)->create([
+        'start_date' => '2026-03-02',
+        'duration_days' => 1,
+        'duration_unit' => DurationUnit::WorkDays,
+        'lock_start' => false,
+        'lock_end' => false,
+        'lock_duration' => true,
+    ]);
+    Task::factory()->forProject($project)->child($parent)->create([
+        'start_date' => '2026-03-02',
+        'duration_days' => 1,
+        'duration_unit' => DurationUnit::WorkDays,
+    ]);
+
+    $this->actingAs($owner)->patch(route('projects.tasks.update', [$project, $parent]), taskPayload([
+        'name' => $parent->name,
+        'start_date' => '2026-04-01',
+        'duration_days' => 1,
+        'duration_unit' => DurationUnit::WorkDays->value,
+        'lock_start' => false,
+        'lock_end' => false,
+        'lock_duration' => true,
+    ]))->assertSessionHasErrors('start_date');
+
+    // Resubmitting the unchanged schedule (e.g. a rename) is still allowed.
+    $this->actingAs($owner)->patch(route('projects.tasks.update', [$project, $parent]), taskPayload([
+        'name' => 'Renamed group',
+        'start_date' => '2026-03-02',
+        'duration_days' => 1,
+        'duration_unit' => DurationUnit::WorkDays->value,
+        'lock_start' => false,
+        'lock_end' => false,
+        'lock_duration' => true,
+    ]))->assertSessionDoesntHaveErrors();
+
+    expect($parent->refresh()->name)->toBe('Renamed group');
+});
+
+test('updating a task through the form pushes its violated successors', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $task = Task::factory()->forProject($project)->create([
+        'start_date' => '2026-01-05',
+        'duration_days' => 5,
+        'duration_unit' => DurationUnit::CalendarDays,
+    ]);
+    $successor = Task::factory()->forProject($project)->unlocked()->create([
+        'start_date' => '2026-01-12',
+        'duration_days' => 2,
+        'duration_unit' => DurationUnit::CalendarDays,
+    ]);
+    $successor->predecessors()->attach($task->id, ['type' => 'finish_to_start']);
+
+    // Extending the duration to 10 days makes the task end Jan 14, so the
+    // successor (Jan 12) slides to Jan 15.
+    $this->actingAs($owner)->patch(route('projects.tasks.update', [$project, $task]), taskPayload([
+        'start_date' => '2026-01-05',
+        'duration_days' => 10,
+        'duration_unit' => DurationUnit::CalendarDays->value,
+    ]))->assertSessionHas('status', 'Task updated — 1 dependent task moved.');
+
+    expect($successor->refresh()->start_date->toDateString())->toBe('2026-01-15');
 });
 
 test('creating a task without a start date defaults to today', function () {

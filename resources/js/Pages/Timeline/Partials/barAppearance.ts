@@ -1,4 +1,5 @@
 import { type RiskLevelValue, type Task, type TaskStatusValue } from '@/types';
+import { describeScheduleLocks } from '@/utils/schedule';
 
 type BarPalette = {
     /** Bar background (the uncompleted portion). */
@@ -84,8 +85,12 @@ export function barSummaryRows(task: Task): { title: string; rows: BarSummaryRow
         rows.push({ label: 'Organization', value: task.organization });
     }
 
-    if (task.is_date_locked) {
-        rows.push({ label: 'Schedule', value: 'Dates locked' });
+    if (task.lock_start || task.lock_end) {
+        rows.push({ label: 'Schedule', value: describeScheduleLocks(task) });
+    }
+
+    if ((task.schedule_conflicts?.length ?? 0) > 0) {
+        rows.push({ label: 'Conflict', value: 'Starts before a dependency finishes' });
     }
 
     return { title: task.name, rows };

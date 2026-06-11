@@ -3,7 +3,8 @@ import { barPalette, riskStripeClass } from '@/Pages/Timeline/Partials/barAppear
 import { type Task } from '@/types';
 import { BAR_HEIGHT, ROW_HEIGHT, type BarMetrics } from '@/utils/gantt';
 import { cn } from '@/utils/cn';
-import { Lock } from 'lucide-react';
+import { describeScheduleLocks, isFullyPinned } from '@/utils/schedule';
+import { Lock, TriangleAlert } from 'lucide-react';
 import { type PointerEvent } from 'react';
 
 type TaskBarProps = {
@@ -50,7 +51,20 @@ export default function TaskBar({ task, bar, interactive = false, dragging = fal
 
                     <span className={cn('relative min-w-0 flex-1 truncate px-2 text-xs font-medium', palette.text)}>{task.name}</span>
 
-                    {task.is_date_locked && <Lock className={cn('relative mr-1 h-3 w-3 shrink-0', palette.text)} aria-label="Dates locked" />}
+                    {(task.schedule_conflicts?.length ?? 0) > 0 && (
+                        <TriangleAlert
+                            data-testid="schedule-conflict-badge"
+                            className="relative mr-1 h-3 w-3 shrink-0 text-red-600 dark:text-red-400"
+                            aria-label="Schedule conflict"
+                        />
+                    )}
+
+                    {(task.lock_start || task.lock_end) && (
+                        <Lock
+                            className={cn('relative mr-1 h-3 w-3 shrink-0', palette.text, !isFullyPinned(task) && 'opacity-50')}
+                            aria-label={describeScheduleLocks(task)}
+                        />
+                    )}
 
                     {interactive && (
                         <span

@@ -60,6 +60,10 @@ class HandleInertiaRequests extends Middleware
             ],
             'flash' => [
                 'status' => fn () => $request->session()->get('status'),
+                // The rules-engine dry-run payload: a schedule edit whose
+                // cascade would introduce conflicts is flashed back here for
+                // the client to confirm (resubmit with confirm: true) or drop.
+                'schedulePreview' => fn () => $request->session()->get('schedulePreview'),
             ],
             // Workspace switcher. Lazy closure so partial reloads (e.g. only the
             // sidebar prefs) skip the query.

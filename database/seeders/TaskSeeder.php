@@ -60,6 +60,20 @@ class TaskSeeder extends Seeder
                 }
             }
         }
+
+        // Normalize the seeded schedule through the rules engine, exactly as
+        // live edits would leave it: parents become their subtree envelopes
+        // and violated movable successors are pushed. Pinned tasks stay put —
+        // the blueprint's deliberate overlap (DV demo) survives as a visible
+        // conflict on the timeline. Quiet query-builder updates: seeding needs
+        // no audit entries or events.
+        foreach ($project->previewSchedule()->moves as $taskId => $move) {
+            Task::query()->whereKey($taskId)->update([
+                'start_date' => $move->toStart,
+                'duration_days' => $move->toDuration,
+                'duration_unit' => $move->toUnit,
+            ]);
+        }
     }
 
     /**
@@ -87,7 +101,11 @@ class TaskSeeder extends Seeder
                 'start_date' => $base->addDays($node['offset']),
                 'duration_days' => $node['duration'],
                 'duration_unit' => DurationUnit::WorkDays,
-                'is_date_locked' => ! ($node['unlocked'] ?? false),
+                // Reactive by default (duration fixed, dates slide with the
+                // rules engine); blueprint nodes opt into pinning.
+                'lock_start' => (bool) ($node['pinned'] ?? false),
+                'lock_end' => false,
+                'lock_duration' => true,
                 'status' => $status,
                 'percent_complete' => $this->percentFor($status),
                 'risk_level' => $node['risk'],
@@ -140,7 +158,7 @@ class TaskSeeder extends Seeder
                 'duration' => 28,
                 'tags' => ['planning'],
                 'children' => [
-                    ['key' => 'test-plan', 'name' => 'Test Plan Development', 'status' => TaskStatus::Complete, 'risk' => RiskLevel::Low, 'org' => 'OT Squadron', 'offset' => 0, 'duration' => 14],
+                    ['key' => 'test-plan', 'name' => 'Test Plan Development', 'status' => TaskStatus::Complete, 'risk' => RiskLevel::Low, 'org' => 'OT Squadron', 'offset' => 0, 'duration' => 14, 'pinned' => true],
                     ['key' => 'range-coord', 'name' => 'Range & Airspace Coordination', 'status' => TaskStatus::Complete, 'risk' => RiskLevel::Medium, 'org' => 'Program Office', 'offset' => 10, 'duration' => 12],
                     ['key' => 'safety-review', 'name' => 'Safety Review Board', 'status' => TaskStatus::Complete, 'risk' => RiskLevel::Medium, 'org' => 'OT Squadron', 'offset' => 20, 'duration' => 8, 'depends' => ['test-plan']],
                 ],
@@ -166,8 +184,8 @@ class TaskSeeder extends Seeder
                         'tags' => ['sensor'],
                         'children' => [
                             ['key' => 'eo-ir', 'name' => 'EO/IR Calibration', 'status' => TaskStatus::Complete, 'risk' => RiskLevel::Low, 'org' => 'Sensor Vendor', 'offset' => 28, 'duration' => 12, 'tags' => ['sensor', 'eo-ir']],
-                            ['key' => 'sar', 'name' => 'SAR Verification', 'status' => TaskStatus::InProgress, 'risk' => RiskLevel::High, 'org' => 'Sensor Vendor', 'offset' => 40, 'duration' => 14, 'depends' => ['eo-ir'], 'unlocked' => true, 'tags' => ['sensor', 'radar']],
-                            ['key' => 'data-link', 'name' => 'Data Link Integration', 'status' => TaskStatus::NotStarted, 'risk' => RiskLevel::Medium, 'org' => 'Comms Detachment', 'offset' => 54, 'duration' => 14, 'depends' => ['sar'], 'unlocked' => true],
+                            ['key' => 'sar', 'name' => 'SAR Verification', 'status' => TaskStatus::InProgress, 'risk' => RiskLevel::High, 'org' => 'Sensor Vendor', 'offset' => 40, 'duration' => 14, 'depends' => ['eo-ir'], 'tags' => ['sensor', 'radar']],
+                            ['key' => 'data-link', 'name' => 'Data Link Integration', 'status' => TaskStatus::NotStarted, 'risk' => RiskLevel::Medium, 'org' => 'Comms Detachment', 'offset' => 54, 'duration' => 14, 'depends' => ['sar']],
                         ],
                     ],
                     [
@@ -199,6 +217,10 @@ class TaskSeeder extends Seeder
                 'children' => [
                     ['key' => 'ew-suite', 'name' => 'Electronic Warfare Suite', 'status' => TaskStatus::NotStarted, 'risk' => RiskLevel::High, 'org' => 'EW Lab', 'offset' => 84, 'duration' => 24, 'tags' => ['ew']],
                     ['key' => 'comms-test', 'name' => 'Communications Test', 'status' => TaskStatus::NotStarted, 'risk' => RiskLevel::Low, 'org' => 'Comms Detachment', 'offset' => 100, 'duration' => 18],
+                    // Deliberately conflicted: a date-pinned demo scheduled
+                    // before its EW-suite predecessor can finish, so the
+                    // timeline shows a red dashed (violated) dependency.
+                    ['key' => 'dv-demo', 'name' => 'DV Day Demonstration', 'status' => TaskStatus::NotStarted, 'risk' => RiskLevel::Medium, 'org' => 'Program Office', 'offset' => 95, 'duration' => 2, 'depends' => ['ew-suite'], 'pinned' => true, 'tags' => ['demo']],
                 ],
             ],
             [

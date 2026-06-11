@@ -47,7 +47,9 @@ class StoreTaskRequest extends FormRequest
             'start_date' => ['nullable', 'date'],
             'duration_days' => ['required', 'integer', 'min:1', 'max:3650'],
             'duration_unit' => ['required', Rule::enum(DurationUnit::class)],
-            'is_date_locked' => ['boolean'],
+            'lock_start' => ['boolean'],
+            'lock_end' => ['boolean'],
+            'lock_duration' => ['boolean'],
             'status' => ['required', Rule::enum(TaskStatus::class)],
             'percent_complete' => ['required', 'integer', 'between:0,100'],
             'risk_level' => ['required', Rule::enum(RiskLevel::class)],
@@ -66,6 +68,13 @@ class StoreTaskRequest extends FormRequest
     {
         return [
             function (Validator $validator): void {
+                if ($this->lockCount() > 2) {
+                    $validator->errors()->add(
+                        'lock_start',
+                        'At most two of start, end, and duration may be locked.',
+                    );
+                }
+
                 $project = $this->route('project');
 
                 if (! $project instanceof Project) {
@@ -123,5 +132,15 @@ class StoreTaskRequest extends FormRequest
         $parentId = $this->validated('parent_id');
 
         return $parentId === null ? null : Task::find($parentId);
+    }
+
+    /**
+     * How many schedule locks the request asks for.
+     */
+    private function lockCount(): int
+    {
+        return (int) $this->boolean('lock_start')
+            + (int) $this->boolean('lock_end')
+            + (int) $this->boolean('lock_duration');
     }
 }

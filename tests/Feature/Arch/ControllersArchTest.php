@@ -13,6 +13,9 @@ arch('controllers only use approved layers')
         'App\Events',
         // Domain value objects (e.g. action verbs passed to Model::logAction()).
         'App\Enums',
+        // Pure schedule-engine value objects (PropagationResult and friends)
+        // returned by the Project model's preview/commit orchestration.
+        'App\Support',
         'Illuminate\Http',
         'Illuminate\Support\Facades\DB',
         'Illuminate\Support\Facades\Mail',

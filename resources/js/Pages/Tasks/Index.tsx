@@ -1,3 +1,4 @@
+import SchedulePreviewDialog from '@/components/schedule-preview-dialog';
 import Badge from '@/components/ui/badge';
 import Button, { ButtonLink } from '@/components/ui/button';
 import Card from '@/components/ui/card';
@@ -140,6 +141,8 @@ export default function Index({ project, tasks }: { project: Project; tasks: Tas
                 onConfirm={confirmComplete}
                 onCancel={() => setCompleting(null)}
             />
+
+            <SchedulePreviewDialog projectId={project.id} />
         </AppLayout>
     );
 }

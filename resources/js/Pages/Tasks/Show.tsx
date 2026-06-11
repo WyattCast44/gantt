@@ -1,5 +1,6 @@
 import ActivityLog from '@/components/activity-log';
 import CommentsThread from '@/components/comments-section';
+import SchedulePreviewDialog from '@/components/schedule-preview-dialog';
 import Badge from '@/components/ui/badge';
 import Button, { ButtonLink, buttonClasses } from '@/components/ui/button';
 import Card from '@/components/ui/card';
@@ -19,6 +20,7 @@ import { destroy as taskDestroy, complete as taskComplete, create as tasksCreate
 import { type BaseClassificationValue, type Dependency, type Document, type Project, type Task } from '@/types';
 import { allowedClassifications } from '@/utils/classification';
 import { formatDateTime } from '@/utils/date';
+import { describeScheduleLocks } from '@/utils/schedule';
 import { Link, useForm, usePage } from '@inertiajs/react';
 import { ArrowLeft, CheckCircle2, Download, GitBranch, History, Info, ListTree, Lock, LockOpen, MessageSquare, Paperclip, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { type FormEvent, type ReactNode, useMemo, useState } from 'react';
@@ -172,10 +174,10 @@ function DetailsPane({ task }: { task: Task }) {
                     {task.duration_days} {task.duration_unit.label.toLowerCase()}
                 </DetailRow>
                 <DetailRow label="End date">{task.end_date ?? <span className="text-slate-400 dark:text-neutral-500">—</span>}</DetailRow>
-                <DetailRow label="Dates">
+                <DetailRow label="Schedule locks">
                     <span className="inline-flex items-center gap-1.5">
-                        {task.is_date_locked ? <Lock className="h-3.5 w-3.5" aria-hidden /> : <LockOpen className="h-3.5 w-3.5" aria-hidden />}
-                        {task.is_date_locked ? 'Locked' : 'Unlocked'}
+                        {task.lock_start || task.lock_end ? <Lock className="h-3.5 w-3.5" aria-hidden /> : <LockOpen className="h-3.5 w-3.5" aria-hidden />}
+                        {describeScheduleLocks(task)}
                     </span>
                 </DetailRow>
                 <DetailRow label="Percent complete">{task.percent_complete}%</DetailRow>
@@ -401,12 +403,17 @@ function DependenciesPane({
                                     key={predecessor.id}
                                     className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 last:border-0 dark:border-border-dark"
                                 >
-                                    <Link
-                                        href={taskShow.url([project.id, predecessor.id])}
-                                        className="truncate text-sm text-slate-900 hover:text-accent-700 dark:text-white dark:hover:text-accent-300"
-                                    >
-                                        {predecessor.name}
-                                    </Link>
+                                    <span className="flex min-w-0 items-center gap-2">
+                                        <Link
+                                            href={taskShow.url([project.id, predecessor.id])}
+                                            className="truncate text-sm text-slate-900 hover:text-accent-700 dark:text-white dark:hover:text-accent-300"
+                                        >
+                                            {predecessor.name}
+                                        </Link>
+                                        {(task.schedule_conflicts ?? []).includes(predecessor.id) && (
+                                            <Badge tone="danger">Conflict</Badge>
+                                        )}
+                                    </span>
                                     {canEdit && (
                                         <Button
                                             variant="ghost"
@@ -644,6 +651,8 @@ export default function Show({
                 onConfirm={() => deleteForm.delete(taskDestroy.url([project.id, task.id]))}
                 onCancel={() => setDeleting(false)}
             />
+
+            <SchedulePreviewDialog projectId={project.id} />
         </AppLayout>
     );
 }

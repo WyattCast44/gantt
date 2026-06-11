@@ -181,7 +181,10 @@ export interface Task {
     duration_unit: Labeled<DurationUnitValue>;
     /** Derived (start + duration, day-grain); null when unscheduled. */
     end_date: string | null;
-    is_date_locked: boolean;
+    /** Independent schedule locks (max two of three; two locks fully pin the task). */
+    lock_start: boolean;
+    lock_end: boolean;
+    lock_duration: boolean;
     status: Labeled<TaskStatusValue>;
     risk_level: Labeled<RiskLevelValue>;
     base_classification: Labeled<BaseClassificationValue>;
@@ -197,6 +200,8 @@ export interface Task {
     has_incomplete_descendants?: boolean;
     /** Predecessor tasks this task depends on (detail view only). */
     predecessors?: Dependency[];
+    /** Ids of loaded predecessors whose finish-to-start constraint this task violates (derived). */
+    schedule_conflicts?: number[];
     /** Successor tasks that depend on this one (detail view only). */
     successors?: Dependency[];
     /** Attached project documents (detail view only). */
@@ -226,10 +231,49 @@ export interface Activity {
     created_at: string | null;
 }
 
+/** One task the rules engine wants to move (SchedulePreview dialog row). */
+export interface ScheduleMovePreview {
+    task_id: number;
+    name: string;
+    reason: 'dependency_push' | 'deadline_compression' | 'rollup';
+    from_start: string | null;
+    to_start: string | null;
+    from_duration: number;
+    to_duration: number;
+    from_unit: DurationUnitValue | null;
+    to_unit: DurationUnitValue | null;
+    caused_by_task_id: number | null;
+    caused_by_name: string | null;
+}
+
+/** One conflict a previewed schedule edit would introduce. */
+export interface ScheduleConflictPreview {
+    predecessor_id: number;
+    predecessor_name: string;
+    successor_id: number;
+    successor_name: string;
+    predecessor_end: string;
+    successor_start: string;
+}
+
+/**
+ * The rules-engine dry-run flashed back when a schedule edit's cascade would
+ * introduce conflicts. The client confirms by resubmitting `input` plus
+ * `confirm: true` to the same route, or drops it to cancel.
+ */
+export interface SchedulePreview {
+    intent: 'reschedule' | 'update' | 'dependency';
+    task_id: number;
+    input: Record<string, unknown>;
+    moves: ScheduleMovePreview[];
+    conflicts: ScheduleConflictPreview[];
+}
+
 export interface SharedProps {
     auth: Auth;
     flash: {
         status: string | null;
+        schedulePreview: SchedulePreview | null;
     };
     /** The few most-recently-updated projects (incl. the current one) for the switcher. */
     recentProjects: ProjectSummary[];

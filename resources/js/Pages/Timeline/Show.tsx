@@ -1,4 +1,5 @@
 import GanttChart from '@/Pages/Timeline/GanttChart';
+import SchedulePreviewDialog from '@/components/schedule-preview-dialog';
 import { ButtonLink } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { create as tasksCreate } from '@/routes/projects/tasks';
@@ -49,6 +50,7 @@ export default function Show({ project, tasks }: TimelineProps) {
             ) : (
                 <GanttChart projectId={project.id} canEdit={project.can.update} />
             )}
+            <SchedulePreviewDialog projectId={project.id} />
         </AppLayout>
     );
 }

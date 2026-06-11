@@ -2,7 +2,7 @@ import Input from '@/components/ui/input';
 import InputError from '@/components/ui/input-error';
 import Select from '@/components/ui/select';
 import { FieldRow } from '@/components/ui/fieldset';
-import { DURATION_UNITS, taskDurationFromDates, taskEndDate, taskStartDate, type DurationUnitValue, type WorkCalendar } from '@/utils/schedule';
+import { DURATION_UNITS, taskDurationFromDates, taskEndDate, taskStartDate, type DurationUnitValue, type ScheduleLocks, type WorkCalendar } from '@/utils/schedule';
 import { formatLongDateFromInput } from '@/utils/date';
 import { cn } from '@/utils/cn';
 import { focusRingNeutral } from '@/utils/focusRing';
@@ -10,9 +10,29 @@ import { useMemo } from 'react';
 
 export type ScheduleMode = 'start_duration' | 'start_end' | 'fixed_duration';
 
-/** Pick the schedule editor mode that best matches a task's stored dates. */
-export function inferScheduleMode(isDateLocked: boolean): ScheduleMode {
-    return isDateLocked ? 'start_duration' : 'fixed_duration';
+/** Pick the schedule editor mode that best matches a task's stored locks. */
+export function inferScheduleMode(locks: ScheduleLocks): ScheduleMode {
+    if (locks.lock_start && locks.lock_end) {
+        return 'start_end';
+    }
+
+    if (locks.lock_start || (locks.lock_end && locks.lock_duration)) {
+        return 'start_duration';
+    }
+
+    return 'fixed_duration';
+}
+
+/** The lock flags each schedule editor mode commits (max two of three). */
+export function locksForScheduleMode(mode: ScheduleMode): ScheduleLocks {
+    switch (mode) {
+        case 'start_duration':
+            return { lock_start: true, lock_end: false, lock_duration: true };
+        case 'start_end':
+            return { lock_start: true, lock_end: true, lock_duration: false };
+        case 'fixed_duration':
+            return { lock_start: false, lock_end: false, lock_duration: true };
+    }
 }
 
 const SCHEDULE_MODES: { value: ScheduleMode; label: string; description: string }[] = [

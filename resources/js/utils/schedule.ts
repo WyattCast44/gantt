@@ -11,6 +11,50 @@ export const DEFAULT_WORK_CALENDAR: WorkCalendar = {
 
 export type DurationUnitValue = 'calendar_days' | 'work_days';
 
+/**
+ * Independent schedule locks (max two of three may be set; two locks derive
+ * the third field, fully pinning the task against automatic movement).
+ */
+export type ScheduleLocks = {
+    lock_start: boolean;
+    lock_end: boolean;
+    lock_duration: boolean;
+};
+
+export function scheduleLockCount(locks: ScheduleLocks): number {
+    return Number(locks.lock_start) + Number(locks.lock_end) + Number(locks.lock_duration);
+}
+
+/** Two locks fix all three schedule fields — the rules engine may never move the task. */
+export function isFullyPinned(locks: ScheduleLocks): boolean {
+    return scheduleLockCount(locks) >= 2;
+}
+
+/** A short human label for the active lock combination. */
+export function describeScheduleLocks(locks: ScheduleLocks): string {
+    if (locks.lock_start && locks.lock_end) {
+        return 'Start & end locked';
+    }
+
+    if (locks.lock_start && locks.lock_duration) {
+        return 'Start & duration locked';
+    }
+
+    if (locks.lock_end && locks.lock_duration) {
+        return 'End & duration locked';
+    }
+
+    if (locks.lock_start) {
+        return 'Start locked';
+    }
+
+    if (locks.lock_end) {
+        return 'Deadline (end locked)';
+    }
+
+    return 'Duration fixed';
+}
+
 export const DURATION_UNITS: { value: DurationUnitValue; label: string }[] = [
     { value: 'work_days', label: 'Work days' },
     { value: 'calendar_days', label: 'Calendar days' },

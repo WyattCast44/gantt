@@ -425,7 +425,9 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
                                                 <TaskBar
                                                     task={row.task}
                                                     bar={displayBar}
-                                                    interactive={canEdit}
+                                                    // Parents are engine-derived envelopes of their
+                                                    // children — only leaf bars can be dragged.
+                                                    interactive={canEdit && row.task.children.length === 0}
                                                     dragging={isDragging}
                                                     onMoveStart={(event) => startMove(row.task, event)}
                                                     onResizeStart={(event) => startResize(row.task, event)}

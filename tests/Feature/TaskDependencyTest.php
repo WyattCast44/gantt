@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\DurationUnit;
 use App\Enums\Role;
 use App\Models\Project;
 use App\Models\Task;
@@ -73,6 +74,100 @@ test('a circular dependency is rejected', function () {
     ])->assertInvalid('predecessor_id');
 
     expect($b->predecessors()->count())->toBe(0);
+});
+
+test('a dependency between ancestor and descendant is rejected', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $parent = Task::factory()->forProject($project)->create();
+    $child = Task::factory()->forProject($project)->child($parent)->create();
+    $grandchild = Task::factory()->forProject($project)->child($child)->create();
+
+    // Either direction: a grandchild on its ancestor, or the ancestor on it.
+    $this->actingAs($owner)->post(route('projects.tasks.dependencies.store', [$project, $grandchild]), [
+        'predecessor_id' => $parent->id,
+    ])->assertInvalid('predecessor_id');
+
+    $this->actingAs($owner)->post(route('projects.tasks.dependencies.store', [$project, $parent]), [
+        'predecessor_id' => $grandchild->id,
+    ])->assertInvalid('predecessor_id');
+
+    expect($grandchild->predecessors()->count())->toBe(0)
+        ->and($parent->predecessors()->count())->toBe(0);
+});
+
+test('a hierarchy-induced cycle is rejected', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $parent = Task::factory()->forProject($project)->create();
+    $child = Task::factory()->forProject($project)->child($parent)->create();
+    $outside = Task::factory()->forProject($project)->create();
+
+    // outside depends on parent; making outside a predecessor of the child
+    // would let a push of the child grow the parent's envelope and re-push
+    // outside — a loop through the hierarchy.
+    $outside->predecessors()->attach($parent->id, ['type' => 'finish_to_start']);
+
+    $this->actingAs($owner)->post(route('projects.tasks.dependencies.store', [$project, $child]), [
+        'predecessor_id' => $outside->id,
+    ])->assertInvalid('predecessor_id');
+
+    expect($child->predecessors()->count())->toBe(0);
+});
+
+test('adding a dependency pushes a violated movable successor into place', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $predecessor = Task::factory()->forProject($project)->create([
+        'start_date' => '2026-01-05',
+        'duration_days' => 10,
+        'duration_unit' => DurationUnit::CalendarDays,
+    ]);
+    $task = Task::factory()->forProject($project)->unlocked()->create([
+        'start_date' => '2026-01-08',
+        'duration_days' => 2,
+        'duration_unit' => DurationUnit::CalendarDays,
+    ]);
+
+    $this->actingAs($owner)->post(route('projects.tasks.dependencies.store', [$project, $task]), [
+        'predecessor_id' => $predecessor->id,
+    ])->assertSessionHas('status', 'Dependency added — 1 task moved.');
+
+    // The predecessor ends Jan 14; the successor slides to Jan 15.
+    expect($task->refresh()->start_date->toDateString())->toBe('2026-01-15')
+        ->and($task->predecessors()->count())->toBe(1);
+});
+
+test('adding a dependency that conflicts with a pinned successor previews then commits', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $predecessor = Task::factory()->forProject($project)->create([
+        'start_date' => '2026-01-05',
+        'duration_days' => 10,
+        'duration_unit' => DurationUnit::CalendarDays,
+    ]);
+    $task = Task::factory()->forProject($project)->pinned()->create([
+        'start_date' => '2026-01-08',
+        'duration_days' => 2,
+        'duration_unit' => DurationUnit::CalendarDays,
+    ]);
+
+    // Without confirm: the preview is flashed and the edge is not created.
+    $this->actingAs($owner)->post(route('projects.tasks.dependencies.store', [$project, $task]), [
+        'predecessor_id' => $predecessor->id,
+    ])->assertSessionHas('schedulePreview', fn (array $preview): bool => $preview['intent'] === 'dependency'
+        && $preview['conflicts'] !== []);
+
+    expect($task->predecessors()->count())->toBe(0);
+
+    // With confirm: the edge lands, the pinned task stays put (conflicted).
+    $this->actingAs($owner)->post(route('projects.tasks.dependencies.store', [$project, $task]), [
+        'predecessor_id' => $predecessor->id,
+        'confirm' => true,
+    ])->assertSessionHas('status', 'Dependency added.');
+
+    expect($task->predecessors()->count())->toBe(1)
+        ->and($task->refresh()->start_date->toDateString())->toBe('2026-01-08');
 });
 
 test('an editor can remove a dependency', function () {

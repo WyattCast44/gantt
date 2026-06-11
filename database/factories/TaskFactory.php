@@ -32,7 +32,9 @@ class TaskFactory extends Factory
             'start_date' => fake()->optional()->dateTimeBetween('-1 month', '+1 month'),
             'duration_days' => fake()->numberBetween(1, 30),
             'duration_unit' => DurationUnit::WorkDays,
-            'is_date_locked' => true,
+            'lock_start' => false,
+            'lock_end' => false,
+            'lock_duration' => true,
             'hierarchy_level' => 1,
             'sort_order' => 0,
             'status' => TaskStatus::NotStarted,
@@ -87,18 +89,51 @@ class TaskFactory extends Factory
     }
 
     /**
-     * Pin the task's dates (the V1 default).
+     * Fully pin the task's schedule (start + duration locked) so the rules
+     * engine may never move it.
      */
-    public function locked(): static
+    public function pinned(): static
     {
-        return $this->state(['is_date_locked' => true]);
+        return $this->state([
+            'lock_start' => true,
+            'lock_end' => false,
+            'lock_duration' => true,
+        ]);
     }
 
     /**
-     * Leave the task's dates unlocked.
+     * Leave the task free to slide (duration preserved, no date locks).
      */
     public function unlocked(): static
     {
-        return $this->state(['is_date_locked' => false]);
+        return $this->state([
+            'lock_start' => false,
+            'lock_end' => false,
+            'lock_duration' => true,
+        ]);
+    }
+
+    /**
+     * Lock only the start date.
+     */
+    public function startLocked(): static
+    {
+        return $this->state([
+            'lock_start' => true,
+            'lock_end' => false,
+            'lock_duration' => false,
+        ]);
+    }
+
+    /**
+     * Lock only the end date (a deadline the engine may compress against).
+     */
+    public function endLocked(): static
+    {
+        return $this->state([
+            'lock_start' => false,
+            'lock_end' => true,
+            'lock_duration' => false,
+        ]);
     }
 }

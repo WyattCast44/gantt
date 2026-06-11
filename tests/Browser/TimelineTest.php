@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\DurationUnit;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
@@ -15,7 +16,8 @@ test('the timeline renders the gantt grid without javascript errors', function (
         'name' => 'Aircraft',
         'start_date' => '2026-01-05',
         'organization' => 'Test Squadron',
-        'is_date_locked' => true,
+        'lock_start' => true,
+        'lock_duration' => true,
     ]);
     Task::factory()->forProject($project)->child($parent)->create(['name' => 'Sensor Integration', 'start_date' => '2026-01-10']);
     actingAs($owner);
@@ -261,6 +263,70 @@ test('the timeline can reorder a task with the move button', function () {
     $page->assertNoJavascriptErrors();
 
     expect($project->tasks()->orderBy('sort_order')->pluck('name')->all())->toBe(['Bravo', 'Alpha']);
+});
+
+test('the timeline marks conflicted dependencies with a red dashed line and a bar badge', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $predecessor = Task::factory()->forProject($project)->create([
+        'name' => 'Calibrate',
+        'start_date' => '2026-01-05',
+        'duration_days' => 10,
+        'duration_unit' => DurationUnit::CalendarDays,
+        'sort_order' => 1,
+    ]);
+    // Pinned successor overlapping its predecessor: a live schedule conflict.
+    $successor = Task::factory()->forProject($project)->pinned()->create([
+        'name' => 'Verify',
+        'start_date' => '2026-01-08',
+        'duration_days' => 2,
+        'duration_unit' => DurationUnit::CalendarDays,
+        'sort_order' => 2,
+    ]);
+    $successor->predecessors()->attach($predecessor->id, ['type' => 'finish_to_start']);
+    actingAs($owner);
+
+    visit("/projects/{$project->id}/timeline")
+        ->assertSee('Verify')
+        ->assertPresent('[data-conflict="true"]')
+        ->assertPresent('[data-testid=schedule-conflict-badge]')
+        ->assertNoJavascriptErrors();
+});
+
+test('a conflicting schedule edit asks for confirmation before applying', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $task = Task::factory()->forProject($project)->create([
+        'name' => 'Calibrate',
+        'start_date' => '2026-01-05',
+        'duration_days' => 2,
+        'duration_unit' => DurationUnit::CalendarDays,
+    ]);
+    $pinned = Task::factory()->forProject($project)->pinned()->create([
+        'name' => 'Demo day',
+        'start_date' => '2026-01-12',
+        'duration_days' => 1,
+        'duration_unit' => DurationUnit::CalendarDays,
+    ]);
+    $pinned->predecessors()->attach($task->id, ['type' => 'finish_to_start']);
+    actingAs($owner);
+
+    // Extend the task through the pinned successor's start: the engine
+    // previews the conflict instead of committing.
+    $page = visit("/projects/{$project->id}/tasks/{$task->id}?tab=edit");
+    $page->fill('#task-duration', '10')
+        ->click('Save changes')
+        ->assertSee('This change creates schedule conflicts')
+        ->assertSee('Demo day');
+
+    expect($task->refresh()->duration_days)->toBe(2);
+
+    $page->click('Apply anyway');
+    $page->wait(0.5);
+    $page->assertNoJavascriptErrors();
+
+    expect($task->refresh()->duration_days)->toBe(10)
+        ->and($pinned->refresh()->start_date->toDateString())->toBe('2026-01-12');
 });
 
 test('the timeline shows an empty state when there are no tasks', function () {

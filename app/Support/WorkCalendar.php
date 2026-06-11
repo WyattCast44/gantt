@@ -66,4 +66,62 @@ class WorkCalendar
 
         return $current;
     }
+
+    /**
+     * The first working day strictly after the given date.
+     */
+    public function nextWorkingDay(CarbonImmutable $date): CarbonImmutable
+    {
+        $current = $date->addDay();
+
+        while (! $this->isWorkingDay($current)) {
+            $current = $current->addDay();
+        }
+
+        return $current;
+    }
+
+    /**
+     * Inverse of {@see self::endDateForWorkDays()}: walk backward from the
+     * inclusive end date counting only working days.
+     */
+    public function startDateForWorkDays(CarbonImmutable $end, int $durationDays): CarbonImmutable
+    {
+        $current = $end;
+        $counted = 0;
+
+        while ($counted < $durationDays) {
+            if ($this->isWorkingDay($current)) {
+                $counted++;
+
+                if ($counted === $durationDays) {
+                    return $current;
+                }
+            }
+
+            $current = $current->subDay();
+        }
+
+        return $current;
+    }
+
+    /**
+     * Inclusive working-day count between two dates (0 when the span contains
+     * no working days).
+     */
+    public function workDaysBetween(CarbonImmutable $start, CarbonImmutable $end): int
+    {
+        $count = 0;
+        $current = $start;
+
+        while ($current->lessThanOrEqualTo($end)) {
+            if ($this->isWorkingDay($current)) {
+                $count++;
+            }
+
+            $current = $current->addDay();
+        }
+
+        return $count;
+    }
 }

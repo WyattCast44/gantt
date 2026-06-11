@@ -26,12 +26,14 @@ class StoreDependencyRequest extends FormRequest
     {
         return [
             'predecessor_id' => ['required', 'integer', 'exists:tasks,id'],
+            'confirm' => ['sometimes', 'boolean'],
         ];
     }
 
     /**
      * Domain guards: a predecessor must belong to the same project, differ from
-     * the successor, not already be linked, and not close a dependency cycle.
+     * the successor, not be an ancestor or descendant of it, not already be
+     * linked, and not close a (hierarchy-aware) dependency cycle.
      */
     public function after(): array
     {
@@ -53,6 +55,15 @@ class StoreDependencyRequest extends FormRequest
 
                 if ($predecessor->project_id !== $project->id) {
                     $validator->errors()->add('predecessor_id', 'The predecessor must belong to this project.');
+
+                    return;
+                }
+
+                if ($task->sharesLineageWith($predecessor)) {
+                    $validator->errors()->add(
+                        'predecessor_id',
+                        'A task cannot depend on its own parent or subtask; the hierarchy already links them.',
+                    );
 
                     return;
                 }

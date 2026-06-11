@@ -47,7 +47,9 @@ class TaskResource extends JsonResource
                 'label' => $this->duration_unit->label(),
             ],
             'end_date' => $this->endDate()?->toDateString(),
-            'is_date_locked' => $this->is_date_locked,
+            'lock_start' => $this->lock_start,
+            'lock_end' => $this->lock_end,
+            'lock_duration' => $this->lock_duration,
             'status' => [
                 'value' => $this->status->value,
                 'label' => $this->status->label(),
@@ -72,6 +74,12 @@ class TaskResource extends JsonResource
                 fn () => $this->hasIncompleteDescendants(),
             ),
             'predecessors' => DependencyResource::collection($this->whenLoaded('predecessors')),
+            // Derived conflict state (predecessor ids this task overlaps);
+            // only computable when predecessors are loaded (timeline + show).
+            'schedule_conflicts' => $this->when(
+                $this->relationLoaded('predecessors'),
+                fn () => $this->scheduleConflictIds(),
+            ),
             'successors' => DependencyResource::collection($this->whenLoaded('successors')),
             'documents' => DocumentResource::collection($this->whenLoaded('documents')),
             'comments' => CommentResource::collection($this->whenLoaded('comments')),

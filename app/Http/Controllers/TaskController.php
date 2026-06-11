@@ -123,21 +123,63 @@ class TaskController
 
         TaskCreated::dispatch($task);
 
+        // Re-run the rules engine: the new leaf reshapes its ancestors'
+        // envelopes and may push tasks depending on them. The new task itself
+        // is pinned for the run — explicit user placement is respected, and
+        // any violation it creates surfaces as a derived conflict instead.
+        $project->commitSchedule(
+            $project->previewSchedule([$task->id => ['lock_start' => true]]),
+            $task,
+        );
+
         return redirect()->route('projects.tasks.show', [$project, $task])
             ->with('status', 'Task created.');
     }
 
     /**
-     * Update a task's metadata and schedule.
+     * Update a task's metadata and schedule, running the rules engine over any
+     * schedule change. The edited task is pinned for the run (explicit user
+     * placement is never bounced); a cascade that would introduce new
+     * conflicts is flashed back as a preview instead of committing.
      */
     public function update(UpdateTaskRequest $request, Project $project, Task $task): RedirectResponse
     {
-        $task->update($request->validated());
+        $input = $request->safe()->except('confirm');
+
+        $before = $project->scheduleGraph()->conflicts();
+        $result = $project->previewSchedule([
+            $task->id => [
+                'start_date' => $input['start_date'] ?? null,
+                'duration_days' => $input['duration_days'],
+                'duration_unit' => $input['duration_unit'],
+                'lock_start' => true,
+            ],
+        ]);
+        $newConflicts = $result->newConflictsVersus($before);
+
+        if ($newConflicts !== [] && ! $request->boolean('confirm')) {
+            return redirect()->back()->with('schedulePreview', [
+                'intent' => 'update',
+                'task_id' => $task->id,
+                'input' => $input,
+                ...$result->toPreviewPayload($newConflicts),
+            ]);
+        }
+
+        $task->update($input);
 
         TaskUpdated::dispatch($task);
 
+        $project->commitSchedule($result, $task);
+
+        $movedCount = count($result->pushedMoves($task->id));
+
         return redirect()->route('projects.tasks.show', [$project, $task])
-            ->with('status', 'Task updated.');
+            ->with('status', match (true) {
+                $movedCount === 0 => 'Task updated.',
+                $movedCount === 1 => 'Task updated — 1 dependent task moved.',
+                default => "Task updated — {$movedCount} dependent tasks moved.",
+            });
     }
 
     /**
@@ -148,6 +190,11 @@ class TaskController
         $this->authorize('update', $project);
 
         $task->delete();
+
+        // Roll ancestors' envelopes back up without the deleted subtree. No
+        // confirm gate: push-only propagation means a shrinking envelope can
+        // never move anything else.
+        $project->commitSchedule($project->previewSchedule(), $task);
 
         // Redirect to the index rather than back() so deleting from the show
         // page (whose URL now 404s) lands somewhere valid.

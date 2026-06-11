@@ -4,7 +4,7 @@ import Input from '@/components/ui/input';
 import InputError from '@/components/ui/input-error';
 import Select from '@/components/ui/select';
 import Textarea from '@/components/ui/textarea';
-import TaskScheduleFields, { inferScheduleMode, type ScheduleMode } from '@/Pages/Tasks/Partials/TaskScheduleFields';
+import TaskScheduleFields, { inferScheduleMode, locksForScheduleMode, type ScheduleMode } from '@/Pages/Tasks/Partials/TaskScheduleFields';
 import { store as taskStore, update as taskUpdate } from '@/routes/projects/tasks';
 import {
     CLASSIFICATIONS,
@@ -28,7 +28,9 @@ type TaskFormData = {
     start_date: string;
     duration_days: number;
     duration_unit: DurationUnitValue;
-    is_date_locked: boolean;
+    lock_start: boolean;
+    lock_end: boolean;
+    lock_duration: boolean;
     status: TaskStatusValue;
     risk_level: RiskLevelValue;
     percent_complete: number;
@@ -64,6 +66,9 @@ export default function TaskForm({
     onCancel,
 }: TaskFormProps) {
     const editing = task !== undefined;
+    // A parent's schedule is the engine-derived envelope of its children; the
+    // backend rejects direct edits, so the form shows it read-only.
+    const scheduleIsDerived = editing && task.children.length > 0;
 
     const form = useForm<TaskFormData>({
         name: task?.name ?? '',
@@ -72,7 +77,9 @@ export default function TaskForm({
         start_date: task ? (task.start_date ?? '') : todayInputDate(),
         duration_days: task?.duration_days ?? 1,
         duration_unit: task?.duration_unit.value ?? 'work_days',
-        is_date_locked: task?.is_date_locked ?? true,
+        lock_start: task?.lock_start ?? true,
+        lock_end: task?.lock_end ?? false,
+        lock_duration: task?.lock_duration ?? true,
         status: task?.status.value ?? 'not_started',
         risk_level: task?.risk_level.value ?? 'low',
         percent_complete: task?.percent_complete ?? 0,
@@ -82,7 +89,13 @@ export default function TaskForm({
     });
 
     const workCalendar = useMemo(() => resolveWorkCalendar(project), [project]);
-    const [scheduleMode, setScheduleMode] = useState<ScheduleMode>(() => inferScheduleMode(task?.is_date_locked ?? true));
+    const [scheduleMode, setScheduleMode] = useState<ScheduleMode>(() =>
+        inferScheduleMode({
+            lock_start: task?.lock_start ?? true,
+            lock_end: task?.lock_end ?? false,
+            lock_duration: task?.lock_duration ?? true,
+        }),
+    );
     const [endDate, setEndDate] = useState(() => {
         if (task?.end_date !== null && task?.end_date !== undefined) {
             return task.end_date;
@@ -102,7 +115,6 @@ export default function TaskForm({
         // empty entries. start_date / parent_id are normalized to null when blank.
         form.transform((data) => {
             let durationDays = data.duration_days;
-            let isDateLocked = data.is_date_locked;
 
             if (scheduleMode === 'start_end') {
                 const derived = taskDurationFromDates(data.start_date, endDate, data.duration_unit, workCalendar);
@@ -110,20 +122,30 @@ export default function TaskForm({
                 if (derived !== null) {
                     durationDays = derived;
                 }
-
-                isDateLocked = true;
-            } else if (scheduleMode === 'fixed_duration') {
-                isDateLocked = false;
-            } else {
-                isDateLocked = true;
             }
+
+            // A derived (parent) schedule is passed through verbatim — the
+            // backend rejects any change to it.
+            const schedule = scheduleIsDerived
+                ? {
+                      start_date: task.start_date,
+                      duration_days: task.duration_days,
+                      duration_unit: task.duration_unit.value,
+                      lock_start: task.lock_start,
+                      lock_end: task.lock_end,
+                      lock_duration: task.lock_duration,
+                  }
+                : {
+                      start_date: data.start_date === '' ? null : data.start_date,
+                      duration_days: durationDays,
+                      duration_unit: data.duration_unit,
+                      ...locksForScheduleMode(scheduleMode),
+                  };
 
             return {
                 ...data,
-                duration_days: durationDays,
-                is_date_locked: isDateLocked,
+                ...schedule,
                 percent_complete: editing ? task.percent_complete : data.percent_complete,
-                start_date: data.start_date === '' ? null : data.start_date,
                 tags: data.tags
                     .split(',')
                     .map((tag) => tag.trim())
@@ -193,24 +215,39 @@ export default function TaskForm({
                     </FieldRow>
                 )}
 
-                <TaskScheduleFields
-                    mode={scheduleMode}
-                    onModeChange={setScheduleMode}
-                    startDate={form.data.start_date}
-                    onStartDateChange={(value) => form.setData('start_date', value)}
-                    endDate={endDate}
-                    onEndDateChange={setEndDate}
-                    durationDays={form.data.duration_days}
-                    onDurationDaysChange={(value) => form.setData('duration_days', value)}
-                    durationUnit={form.data.duration_unit}
-                    onDurationUnitChange={(value) => form.setData('duration_unit', value)}
-                    workCalendar={workCalendar}
-                    errors={{
-                        start_date: form.errors.start_date,
-                        duration_days: form.errors.duration_days,
-                        duration_unit: form.errors.duration_unit,
-                    }}
-                />
+                {scheduleIsDerived ? (
+                    <FieldRow label="Schedule">
+                        <div data-testid="task-schedule-derived">
+                            <p className="text-sm text-slate-900 dark:text-white">
+                                {task.start_date ?? 'Unscheduled'}
+                                {task.end_date !== null && task.end_date !== task.start_date ? ` → ${task.end_date}` : ''}
+                                {` (${task.duration_days} ${task.duration_unit.label.toLowerCase()})`}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
+                                Derived from this task's subtasks — reschedule the subtasks to move it.
+                            </p>
+                        </div>
+                    </FieldRow>
+                ) : (
+                    <TaskScheduleFields
+                        mode={scheduleMode}
+                        onModeChange={setScheduleMode}
+                        startDate={form.data.start_date}
+                        onStartDateChange={(value) => form.setData('start_date', value)}
+                        endDate={endDate}
+                        onEndDateChange={setEndDate}
+                        durationDays={form.data.duration_days}
+                        onDurationDaysChange={(value) => form.setData('duration_days', value)}
+                        durationUnit={form.data.duration_unit}
+                        onDurationUnitChange={(value) => form.setData('duration_unit', value)}
+                        workCalendar={workCalendar}
+                        errors={{
+                            start_date: form.errors.start_date,
+                            duration_days: form.errors.duration_days,
+                            duration_unit: form.errors.duration_unit,
+                        }}
+                    />
+                )}
 
                 <FieldRow label="Status" htmlFor="task-status" required>
                     <Select id="task-status" value={form.data.status} onChange={(event) => form.setData('status', event.target.value as TaskStatusValue)}>

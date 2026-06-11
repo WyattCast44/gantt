@@ -23,7 +23,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\DB;
 use Spatie\EloquentSortable\Sortable;
 use Spatie\EloquentSortable\SortableTrait;
 
@@ -38,7 +37,9 @@ use Spatie\EloquentSortable\SortableTrait;
     'start_date',
     'duration_days',
     'duration_unit',
-    'is_date_locked',
+    'lock_start',
+    'lock_end',
+    'lock_duration',
     'status',
     'percent_complete',
     'risk_level',
@@ -79,7 +80,9 @@ class Task extends Model implements Sortable
             'start_date' => 'date',
             'duration_days' => 'integer',
             'duration_unit' => DurationUnit::class,
-            'is_date_locked' => 'boolean',
+            'lock_start' => 'boolean',
+            'lock_end' => 'boolean',
+            'lock_duration' => 'boolean',
             'hierarchy_level' => 'integer',
             'sort_order' => 'integer',
             'status' => TaskStatus::class,
@@ -96,9 +99,19 @@ class Task extends Model implements Sortable
      * Soft-delete the whole subtree when a task is deleted, so a removed parent
      * never leaves orphaned descendants. Filesystem-free multi-write lives on
      * the model (per C5). Force-deletes are left to the database cascade.
+     *
+     * The saving hook is the safety net for the lock invariant (at most two of
+     * start/end/duration may be locked — locking two derives the third); the
+     * FormRequests give the user-facing message.
      */
     protected static function booted(): void
     {
+        static::saving(function (Task $task): void {
+            if ($task->lockCount() > 2) {
+                throw new \LogicException('At most two of start, end, and duration may be locked.');
+            }
+        });
+
         static::deleting(function (Task $task): void {
             if ($task->isForceDeleting()) {
                 return;
@@ -259,6 +272,60 @@ class Task extends Model implements Sortable
     }
 
     /**
+     * The ids of loaded predecessors whose finish-to-start constraint this
+     * task currently violates (it starts on or before they end). Derived
+     * state, never stored — this is the read-side mirror of the engine's
+     * ScheduleGraph::conflicts(). Requires `predecessors` to be eager-loaded.
+     *
+     * @return list<int>
+     */
+    public function scheduleConflictIds(): array
+    {
+        if ($this->start_date === null) {
+            return [];
+        }
+
+        $conflicts = [];
+
+        foreach ($this->predecessors as $predecessor) {
+            $predecessorEnd = $predecessor->endDate();
+
+            if ($predecessorEnd !== null && $this->start_date->lessThanOrEqualTo($predecessorEnd)) {
+                $conflicts[] = $predecessor->id;
+            }
+        }
+
+        return $conflicts;
+    }
+
+    /**
+     * How many of the three schedule fields (start, end, duration) are locked.
+     */
+    public function lockCount(): int
+    {
+        return (int) $this->lock_start + (int) $this->lock_end + (int) $this->lock_duration;
+    }
+
+    /**
+     * Whether the schedule is fully pinned: two locks fix all three fields, so
+     * the rules engine may never move this task automatically.
+     */
+    public function isFullyPinned(): bool
+    {
+        return $this->lockCount() >= 2;
+    }
+
+    /**
+     * Whether the start date is fixed — locked directly, or derived as fixed
+     * because both end and duration are locked. A pinned start means dependency
+     * pushes conflict rather than move this task.
+     */
+    public function startIsPinned(): bool
+    {
+        return $this->lock_start || ($this->lock_end && $this->lock_duration);
+    }
+
+    /**
      * Whether any descendant (excluding this task) is not complete.
      */
     public function hasIncompleteDescendants(): bool
@@ -324,41 +391,32 @@ class Task extends Model implements Sortable
 
     /**
      * Whether adding the given predecessor (edge: predecessor -> this) would
-     * close a cycle in the finish-to-start graph. A cycle forms when the
-     * candidate predecessor is already a transitive successor of this task.
-     * V1 blocks the edge rather than propagating (FR-6).
+     * close a cycle in the finish-to-start graph (FR-6). The check is
+     * hierarchy-aware: pushing this task moves its subtree and grows its
+     * ancestors' envelopes, so an edge is also illegal when that coupling
+     * could feed a schedule change back into the candidate predecessor.
      */
     public function wouldCreateCycle(Task $predecessor): bool
     {
-        if ($predecessor->id === $this->id) {
+        $project = $this->relationLoaded('project')
+            ? $this->project
+            : $this->project()->firstOrFail();
+
+        return $project->scheduleGraph()->wouldLoop($predecessor->id, $this->id);
+    }
+
+    /**
+     * Whether this task and the other share an ancestor/descendant line in the
+     * hierarchy (either direction). Dependencies between a task and its own
+     * subtree or ancestors are forbidden — the hierarchy already couples them.
+     */
+    public function sharesLineageWith(Task $other): bool
+    {
+        if ($this->id === $other->id) {
             return true;
         }
 
-        $stack = [$this->id];
-        $visited = [];
-
-        while ($stack !== []) {
-            $currentId = array_pop($stack);
-
-            if (isset($visited[$currentId])) {
-                continue;
-            }
-
-            $visited[$currentId] = true;
-
-            $successorIds = DB::table('task_dependencies')
-                ->where('predecessor_id', $currentId)
-                ->pluck('successor_id');
-
-            foreach ($successorIds as $successorId) {
-                if ((int) $successorId === $predecessor->id) {
-                    return true;
-                }
-
-                $stack[] = $successorId;
-            }
-        }
-
-        return false;
+        return in_array($other->id, $this->descendantIds(), true)
+            || in_array($this->id, $other->descendantIds(), true);
     }
 }
