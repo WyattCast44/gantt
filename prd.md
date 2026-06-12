@@ -2,7 +2,7 @@
 
 Operational Test Timeline & Dependency Management Platform
 
-_Version 14 - Phases 1–8 Implemented (Architecture, Auth & RBAC, Project Topologies + Workspace Shell + Membership, Document Ingestion, Polymorphic Commenting, Activity-Logging Foundation, Task Core Lifecycle + Temporal Logic + Domain Event Bus + Dependencies, UI Design System + Gantt State Engine, Schedule Rules Engine). Phase 8 delivered automatic push-only date propagation along finish-to-start dependencies with a dry-run/confirm protocol, the target 3-lock model (independent start/end/duration locks, max two of three — replacing `is_date_locked`), engine-derived parent roll-up envelopes, hierarchy-aware cycle detection, and derived schedule-conflict surfacing (red dashed dependency lines + warning badges)._
+_Version 15 - Phases 1–8 Implemented (Architecture, Auth & RBAC, Project Topologies + Workspace Shell + Membership, Document Ingestion, Polymorphic Commenting, Activity-Logging Foundation, Task Core Lifecycle + Temporal Logic + Domain Event Bus + Dependencies, UI Design System + Gantt State Engine, Schedule Rules Engine). Phase 8 delivered automatic push-only date propagation along finish-to-start dependencies with a dry-run/confirm protocol, the target 3-lock model (independent start/end/duration locks, max two of three — replacing `is_date_locked`), engine-derived parent roll-up envelopes, hierarchy-aware cycle detection, and derived schedule-conflict surfacing (red dashed dependency lines + warning badges). Phase 9 (Timeline Quick Authoring & On-Chart Dependency Editing) is specified below — see the "Phase 9 Specification" section._
 
 # Overview
 
@@ -209,6 +209,8 @@ The application shall provide:
 - Drag-and-drop timeline adjustments
 - Expand/collapse task hierarchy
 
+- **\[PHASE 9\]** The timeline becomes a primary authoring surface: a keyboard-driven row selection model, name-only quick task/subtask creation via an inline draft row with smart defaults, inline rename, and pointer-anchored custom context menus (FR-18 – FR-20, FR-22). See "Phase 9 Specification".
+
 ### Zoom-Adaptive Level of Detail
 
 - **\[V1 DECISION\]** The Gantt chart shall behave like a slippy web map (e.g., Google Maps): the level of detail adapts to the zoom level. As the user zooms out, lower-level subtasks progressively fold/hide so only higher-level parent tasks remain visible. As the user zooms in, subtasks and additional details progressively reappear.
@@ -254,6 +256,8 @@ Tasks may depend on multiple predecessor tasks. When automatic propagation is la
 ### Dependency Visualization
 
 Dependencies shall be displayed graphically on the Gantt chart in V1, independent of whether propagation is active.
+
+- **\[PHASE 9\]** Dependencies become creatable and removable directly on the Gantt: drag from a bar's finish-side handle to a target task (or a context-menu link mode), and remove via a clickable connector or the task context menu, reusing the Phase 8 dry-run/confirm protocol unchanged (FR-21). See "Phase 9 Specification".
 
 ## 5\. Workday-Aware Scheduling
 
@@ -460,6 +464,16 @@ Future versions may support project cloning, branching schedules, and alternativ
 **FR-16.** A project is owned by its creating user, who may invite other users as editors or viewers; access is scoped to project membership.
 
 **FR-17.** Users shall be able to capture schedule baselines (snapshots) and compare the current schedule against a saved baseline.
+
+**FR-18.** The Gantt timeline shall support a keyboard-driven row selection model (click or arrow-key navigation, visible highlight) with hotkeys for creating, renaming, opening, and deleting tasks.
+
+**FR-19.** Users shall be able to create tasks and subtasks from the timeline by name alone via an inline draft row; all other fields receive smart defaults (context-anchored start date, 1 work-day duration) so every quick task immediately renders a bar. Enter chains the next draft for rapid scaffolding.
+
+**FR-20.** Users shall be able to rename a task inline from the timeline without opening the task detail page.
+
+**FR-21.** Users shall be able to create finish-to-start dependencies directly on the timeline (drag from a bar's finish-side handle to a target task, or a context-menu link mode) and remove them (click a connector, or via the task context menu), with the Phase 8 dry-run/confirm protocol surfacing cascade conflicts unchanged.
+
+**FR-22.** The timeline shall provide custom context menus (replacing the native menu) on task rows/bars, empty chart space, and dependency connectors, scoped to the user's role.
 
 # Non-Functional Requirements
 
@@ -701,9 +715,160 @@ Locked the component rules and built the deterministic Zustand-based viewport st
 
 The headline post-MVP enhancement, pulled forward: a pure, deterministic propagation engine (`app/Support/Propagation`) that makes tasks reactive. Push-only finish-to-start propagation (slack preserved; multiple predecessors = max constraint), the target locking model from §4 (independent `lock_start`/`lock_end`/`lock_duration`, max two of three; `is_date_locked` dropped), engine-maintained parent envelopes (rolled-up schedules, §2), hierarchy-aware cycle detection (FR-6), a dry-run/confirm protocol for edits whose cascade would introduce conflicts, and derived conflict surfacing on the Gantt. See "Implementation Status & Established Conventions (through Phase 8)".
 
+### Phase 9 - Timeline Quick Authoring & On-Chart Dependency Editing — PLANNED
+
+Turn the timeline from a viewer-with-drag into the primary authoring surface: a row selection model with keyboard navigation and hotkeys, an inline draft row for name-only task/subtask creation with smart defaults and Enter-chaining (FR-18, FR-19), inline rename (FR-20), drag-to-link + context-menu dependency creation and on-chart removal riding the Phase 8 dry-run/confirm protocol unchanged (FR-21), and pointer-anchored custom context menus (FR-22). Backend lift is deliberately small: a quick-store endpoint with server-side defaults, a rename endpoint, and a destroy redirect-back option — no engine or dependency-endpoint changes. Reparenting of existing tasks remains deferred. See "Phase 9 Specification" below.
+
 ### Future Phase - Notification Engine Deployment
 
 Add new listeners (e.g., SendTaskAssignmentNotification) that handle delivery criteria, per-user preferences, batching/throttling, and message queuing - built on top of the Phase 6 event foundation without altering it.
+
+# Phase 9 Specification — Timeline Quick Authoring & On-Chart Dependency Editing
+
+## Overview
+
+Phase 9 makes the Timeline page the fastest place to build out a plan. Power users scaffold a task tree by typing names — hotkey, name, Enter, name, Enter — and wire up dependencies by dragging between bars, returning later to enrich tasks with detail. Three pillars:
+
+1. **Selection + keyboard model** — a prerequisite: hotkeys need a "current row".
+2. **Inline quick-create** — name-only creation of siblings and subtasks with smart defaults; every quick task gets dates so it renders a bar immediately.
+3. **On-chart dependencies** — create by drag-to-link (or context-menu link mode), remove by clicking a connector; the Phase 8 `schedulePreview`/confirm protocol is reused unchanged.
+
+All mutating affordances are editor+ only (`ProjectPolicy::update`); viewers retain a read-only timeline.
+
+## P9-1. Selection & Keyboard Model
+
+A new `selectedTaskId` lives in the Gantt store (`useGanttStore`).
+
+- **Acquire selection:** click anywhere on a row's left-pane cell (outside the name link, chevron, and reorder grip) or click — not drag — a task bar. Clear: Esc (when no draft/rename/link is active) or click on empty chart space.
+- **Visual:** full-row highlight spanning both panes, distinct from hover; uses `accent-*` tokens with dark variants.
+- **Virtualization-safe focus:** rows unmount when scrolled away, so keyboard handling stays on the scroll container (`tabIndex=0`) with `aria-activedescendant` pointing at stable per-row ids (`gantt-row-{taskId}`). Any operation on the selection first calls `virtualizer.scrollToIndex()` so the row is mounted and visible.
+- **Reconciliation:** when `setTasks()` drops the selected task (concurrent edit/delete), selection moves to the nearest surviving visible row (next, else previous, else cleared).
+
+### Hotkey map
+
+Added to the existing keydown handling in `GanttChart.tsx`, with the existing guards (ignore when an input/textarea/select/contenteditable is focused; ignore modified keys except where listed). Mutating keys are no-ops for viewers. No conflicts with existing D/M/Q/Y zoom and T (today).
+
+| Key | Action |
+|---|---|
+| ArrowUp / ArrowDown | Move selection through visible rows (selects first/last row when nothing is selected); auto-scrolls |
+| ArrowLeft / ArrowRight | Collapse / expand the selected parent row (tree convention) |
+| **N** | New task — draft row as next sibling after the selected row; at end of root tasks when nothing selected |
+| **Shift+N** | New subtask — draft row as last child of the selected row; disabled at hierarchy level 5 |
+| **F2** | Rename the selected task inline |
+| **Enter** | Open the selected task's detail page |
+| **Delete / Backspace** | Delete the selected task (confirm dialog; warns subtree is deleted) |
+| **Esc** | Cancel draft / rename / link mode first; otherwise clear selection |
+
+Hotkeys are discoverable via the existing `keyboard-shortcut` component: hints shown on context-menu items and in the timeline's shortcut legend alongside the zoom keys.
+
+## P9-2. Inline Quick-Create (Draft Row)
+
+**Surface decision: a transient inline draft row in the left pane** — not a modal or floating input — preserving positional context and the type-Enter-type-Enter flow.
+
+- The store gains `draft: { parentId, afterId } | null`. `computeLayout()` splices one synthetic row at the draft's position (after `afterId`'s subtree within the sibling group, else at the end of the group), so row tops, content height, and the virtualizer count account for it naturally. The draft is keyed by a stable synthetic id and auto-focuses its `<input>`.
+- The draft renders at the correct indent; the bar track shows a **ghost bar** at the smart-default dates so the user sees where the task will land.
+- **Keys inside the draft input:**
+  - **Enter** — commit (POST quick-store) and immediately open a fresh draft directly below (chaining).
+  - **Esc** — cancel. Blur: commit if non-blank, cancel if blank/whitespace (never POST whitespace-only names).
+  - **Tab / Shift+Tab** — indent/outdent **the draft only**: re-anchor `parentId` to the previous visible row's task / to the grandparent, clamped to depth 1–5. Committed tasks are never reparented (deferred — see Out of Scope).
+
+### Smart defaults (resolved server-side)
+
+Every quick task gets dates — **never create unscheduled tasks from the timeline** (an invisible row on a chart-first surface reads as a bug).
+
+- `start_date`: **context anchor** — the `after_id` sibling's start date if scheduled; else the parent's start date; else today. Parallel same-day start, not chained after the sibling's end: serial chaining would imply a dependency that doesn't exist, and Phase 9 makes real dependencies cheap. The anchor also prevents a today-default from dragging a far-future parent envelope back to today.
+- `duration_days = 1`, `duration_unit = work_days` (matches the full form's default), `status = not_started`, `percent_complete = 0`, default risk, no locks, `base_classification` = the lowest marking the project baseline dominates.
+- After save the engine runs exactly as full-form creation does: new task pinned (`lock_start` override) via `previewSchedule()` + `commitSchedule()` — ancestors' envelopes reshape, no confirm gate.
+
+### Optimistic UX
+
+Consistent with the drag/reorder patterns (optimistic preview held until the server confirms):
+
+- On Enter, the draft freezes into a greyed **pending placeholder row** (name, indent, ghost bar) and a fresh draft opens below — typing is never blocked.
+- POSTs use `preserveScroll: true, preserveState: true`; the round-trip's updated `tasks` prop replaces the placeholder via `setTasks()` in the same render. Validation errors reopen the draft inline with the message.
+- **Creates are serialized:** one POST in flight; subsequent commits queue client-side and flush in order (sort position depends on the prior create existing). A mid-queue failure stops the flush and reopens the failed item as a draft, leaving later queued items as drafts beneath it. No client-token reconciliation needed given serialization.
+
+## P9-3. Inline Rename
+
+F2 or context-menu **Rename** swaps the selected row's name for a pre-filled, pre-selected inline input (same treatment as the draft row). Enter commits via the rename endpoint; Esc reverts. Round-trip uses `preserveScroll/preserveState`. No engine run (a name can't move dates).
+
+## P9-4. On-Chart Dependencies
+
+Both creation modes drive one **linking state machine** (store slice `linking: { sourceTaskId } | null`; transient pointer position stays in component state). Direction is single and consistent everywhere: **you always link from predecessor to successor**.
+
+### Drag-to-link (primary)
+
+- Hovering a bar (editors only) reveals a circular **connector handle at the bar's finish (right) edge** — FS-only engine. Pointer-down starts linking; an elbow preview line (same styling as `DependencyLayer`) follows the cursor in a top overlay SVG.
+- **Valid drop target:** another task's bar or its row's bar track. Client-side pre-checks from data already in the store: not self, not ancestor/descendant, not a duplicate edge. Invalid hover targets get a red tint, not-allowed cursor, and a short reason tooltip. Cycle detection stays server-side (`ScheduleGraph::wouldLoop`) and surfaces as a normal validation error flash.
+- **Autoscroll:** pointer near the container's top/bottom edges scrolls vertically in a rAF loop; horizontal edges reuse the existing range-extension behavior.
+- **Drop** → `POST projects.tasks.dependencies.store` on the target with `{ predecessor_id: source }`, `preserveScroll/preserveState`. Cascade conflicts ride the **existing** dry-run protocol: the backend flashes `schedulePreview`, the already-mounted preview dialog shows moves/conflicts, and confirm resubmits with `confirm: true`. Zero new confirm UX.
+- Esc or pointer-up off-target cancels.
+
+### Context-menu link mode (fallback; covers bar-less tasks)
+
+**"Link to successor…"** on the task context menu enters the same linking state in click-to-complete mode: a persistent hint bar appears ("Linking *Foo* → click a task to make it the successor — Esc to cancel"); clicking any row or bar completes with identical validation and POST. This is the path for unscheduled (bar-less) source tasks. A reverse "link from predecessor…" mode is cut — one direction, one mental model.
+
+### Removal
+
+- Connectors in `DependencyLayer` become interactive: each visible path gains an invisible twin hit-path (`stroke-width: 10`, `pointer-events: stroke`; the layer drops `pointer-events-none`). Hover highlights the connector; click or right-click opens a small menu at the pointer: header "*Pred* → *Succ*", destructive item **Remove dependency** → existing `DELETE projects.tasks.dependencies.destroy`. No extra confirm (matches the endpoint's current behavior; re-adding is one drag).
+- Fallback for hard-to-click lines: the task context menu's **Dependencies ▸** submenu lists current predecessors, each with a Remove action.
+
+## P9-5. Context Menus
+
+A new `ContextMenu` component in `components/ui/` — pointer-anchored portaled panel, structurally a sibling of `dropdown-menu.tsx` (reuses its item/label/separator styling; adds open-at-`{x,y}` from `onContextMenu` + `preventDefault`, viewport-edge flipping, one-open-at-a-time, Esc/outside-click dismissal). No new dependency. Menus per surface:
+
+1. **Task row / task bar (same menu):** New task below (N) · New subtask (Shift+N; disabled at depth 5 with reason) · Rename (F2) · — · Link to successor… · Dependencies ▸ (predecessors → Remove; empty state "No dependencies") · — · Open details (Enter) · — · Delete… (Del, destructive). Viewers see only "Open details".
+2. **Empty timeline area:** New task (at end of roots) · — · Expand all · Collapse all · Go to today (T).
+3. **Dependency connector:** header "*Pred* → *Succ*" · Remove dependency.
+
+Items show hotkey hints via the `keyboard-shortcut` component and disable with a stated reason (depth cap, role).
+
+## P9-6. Backend Additions (deliberately minimal)
+
+Per C5 (skinny controllers, rich models) and C1 (Inertia, not REST). No engine or dependency-endpoint changes.
+
+1. **Quick store** — `POST /projects/{project}/tasks/quick` (`projects.tasks.quick-store`), invokable `QuickStoreTaskController` + `QuickStoreTaskRequest`. Input: `name` (required, max 255), `parent_id` (nullable; in-project + `canHaveChildren()` guards as in `StoreTaskRequest`), `after_id` (nullable; must belong to the same sibling group as `parent_id`). Server fills all defaults (P9-2), computes insert-after `sort_order` (shift later siblings in a transaction), dispatches `TaskCreated`, runs the pinned `commitSchedule`, `redirect()->back()`. A separate request class — not `StoreTaskRequest` — because defaults belong server-side and the full form's required fields would force a faked payload.
+2. **Rename** — `PATCH /projects/{project}/tasks/{task}/rename` (`projects.tasks.rename`), invokable `RenameTaskController`, body `{ name }`. Dispatches `TaskUpdated`, `redirect()->back()`. Reusing `tasks.update` was rejected: it demands the full field set and runs a schedule preview for a no-op.
+3. **Destroy redirect** — `TaskController@destroy` accepts an optional flag (e.g. `from=timeline`) to redirect back instead of to `tasks.index`. Default unchanged.
+
+Activity logging is automatic (`LogsModelActivity`); dependency add/remove keep logging `DependencyAdded`/`DependencyRemoved` via the existing controller.
+
+## P9-7. Out of Scope (deferred)
+
+- **Indent/outdent (reparenting) of existing tasks** — `UpdateTaskRequest` deliberately forbids `parent_id`; doing it right needs subtree `hierarchy_level` re-leveling, depth validation against the deepest descendant, `sort_order` resequencing in both sibling groups, a double engine pass, and activity logging. Its own phase. (Draft-row Tab indenting needs none of that.)
+- Cross-parent drag reorder (reorder stays sibling-scoped).
+- Dependency types beyond finish-to-start; lag/lead.
+- Reverse "link from predecessor" mode; multi-select; bulk operations; undo.
+- Editing dates/status from context menus (the detail page exists; menus stay shallow).
+- Touch/long-press affordances — desktop power-user feature.
+
+## P9-8. Edge Cases
+
+1. **Max depth 5:** Shift+N / menu item disabled with reason at level 5; draft Tab clamps; server re-validates via `canHaveChildren()`.
+2. **Viewer role:** no handles, drafts, or mutating hotkeys; navigation, selection, and Enter-to-open still work; task menu reduces to "Open details"; connector menu hidden.
+3. **Shift+N on a collapsed parent:** auto-expand before opening the draft so it's visible.
+4. **Zoom LOD fold:** if the draft's depth exceeds the current zoom's `maxDepth`, switch to the nearest zoom level that shows it (existing focal-point-preserving zoom change) before opening the draft.
+5. **Propagation during quick ops:** quick create commits unconditionally (pinned new task — matches full-form store semantics); conflicts it creates surface as the existing dashed-red derived edges, not a modal. Dependency adds keep the confirm gate. If a `schedulePreview` dialog opens while a draft is active, the draft input is disabled until the dialog resolves.
+6. **Concurrent edits:** `setTasks()` reconciliation drops a dangling `selectedTaskId` (nearest-row fallback); a draft whose `afterId` vanished re-anchors to the end of its parent group (or cancels if the parent vanished).
+7. **Linking endpoints off-screen:** the preview line draws from the source bar's layout coordinates; the overlay spans the full content size (like `DependencyLayer`) so it clips naturally.
+8. **Linking to a bar-less successor:** allowed via row click in click-click mode; the engine schedules/pushes it on commit per existing semantics.
+9. **Right-click on resize handle / reorder grip:** the context menu wins (`preventDefault`, no drag start).
+
+## P9-9. Testing
+
+- **Pest feature tests:** `QuickStoreTaskTest` — date anchoring (sibling / parent / today), classification floor, `after_id` positioning + sibling-group guard, depth cap, viewer 403, envelope reshaping, serialized inserts keep order. `RenameTaskTest` — validation, authorization, no schedule side-effects. Destroy redirect-back. Existing `TaskDependencyTest` already covers the store/destroy/confirm protocol.
+- **Layout unit tests:** `computeLayout()` draft-row splice — after-subtree insertion, end-of-group, collapsed parents, zoom fold.
+- **Pest browser tests (Playwright):** N → type → Enter → type → Enter creates two ordered tasks with bars; Shift+N under a collapsed parent auto-expands; Tab indents the draft; F2 rename round-trips; drag handle → bar creates a dependency and draws the connector; a conflicting link pops the preview dialog and confirm commits; right-click connector removes the edge; arrow-key navigation scrolls the virtualized list; viewer sees no editing affordances.
+
+## P9-10. Build Sequence (each step shippable)
+
+1. Backend endpoints + feature tests (quick-store, rename, destroy redirect).
+2. Store slices (`selectedTaskId`, `draft`, `linking`) + `computeLayout` draft splice + unit tests.
+3. Selection, keyboard navigation, hotkeys, `aria-activedescendant` wiring.
+4. Draft row component + serialized commit queue + pending placeholders.
+5. `ContextMenu` UI component; task/empty/connector menus; inline rename.
+6. Linking state machine: handles, preview overlay, autoscroll; connector hit-areas + removal.
+7. Browser test suite.
 
 # Implementation Status & Established Conventions (through Phase 2)
 
