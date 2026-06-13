@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\ActivityAction;
 use App\Enums\BaseClassification;
 use App\Enums\DurationUnit;
 use App\Enums\RiskLevel;
@@ -65,6 +66,9 @@ class QuickStoreTaskController
         });
 
         TaskCreated::dispatch($task);
+
+        // Record the creation in the project's history audit log.
+        $project->logAction(ActivityAction::TaskCreated, ['task' => $task->name]);
 
         // Re-run the rules engine: the new leaf reshapes its ancestors'
         // envelopes and may push tasks depending on them. The new task itself

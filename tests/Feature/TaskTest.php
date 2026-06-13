@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\ActivityAction;
 use App\Enums\BaseClassification;
 use App\Enums\DurationUnit;
 use App\Enums\RiskLevel;
@@ -356,6 +357,45 @@ test('deleting a task soft-deletes its whole subtree', function () {
     expect(Task::withTrashed()->find($parent->id)->trashed())->toBeTrue()
         ->and(Task::withTrashed()->find($child->id)->trashed())->toBeTrue()
         ->and(Task::withTrashed()->find($grandchild->id)->trashed())->toBeTrue();
+});
+
+test('creating a task records a TaskCreated entry in the project history', function () {
+    $editor = User::factory()->create();
+    $project = Project::factory()->withMember($editor, Role::Editor)->create();
+
+    $this->actingAs($editor)->post(route('projects.tasks.store', $project), taskPayload(['name' => 'EO Calibration']));
+
+    $activity = $project->activitiesAsSubject()->where('event', ActivityAction::TaskCreated->value)->first();
+
+    expect($activity)->not->toBeNull()
+        ->and($activity->properties['task'])->toBe('EO Calibration')
+        ->and($activity->causer_id)->toBe($editor->id);
+});
+
+test('quick-creating a task records a TaskCreated entry in the project history', function () {
+    $editor = User::factory()->create();
+    $project = Project::factory()->withMember($editor, Role::Editor)->create();
+
+    $this->actingAs($editor)->post(route('projects.tasks.quick-store', $project), ['name' => 'Scaffolded']);
+
+    $activity = $project->activitiesAsSubject()->where('event', ActivityAction::TaskCreated->value)->first();
+
+    expect($activity)->not->toBeNull()
+        ->and($activity->properties['task'])->toBe('Scaffolded');
+});
+
+test('deleting a task records a TaskDeleted entry in the project history', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $task = Task::factory()->forProject($project)->create(['name' => 'Retired task']);
+
+    $this->actingAs($owner)->delete(route('projects.tasks.destroy', [$project, $task]));
+
+    $activity = $project->activitiesAsSubject()->where('event', ActivityAction::TaskDeleted->value)->first();
+
+    expect($activity)->not->toBeNull()
+        ->and($activity->properties['task'])->toBe('Retired task')
+        ->and($activity->causer_id)->toBe($owner->id);
 });
 
 test('deleting from the timeline redirects back to the timeline', function () {

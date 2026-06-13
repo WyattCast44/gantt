@@ -24,6 +24,8 @@ const EVENT_LABELS: Record<string, string> = {
     detached: 'Detached',
     dependency_added: 'Dependency added',
     dependency_removed: 'Dependency removed',
+    task_created: 'Task created',
+    task_deleted: 'Task deleted',
 };
 
 /** Render an arbitrary logged value compactly for the diff display. */

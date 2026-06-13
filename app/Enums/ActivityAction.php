@@ -21,4 +21,6 @@ enum ActivityAction: string
     case DependencyRemoved = 'dependency_removed';
     case Reordered = 'reordered';
     case SchedulePropagated = 'schedule_propagated';
+    case TaskCreated = 'task_created';
+    case TaskDeleted = 'task_deleted';
 }
