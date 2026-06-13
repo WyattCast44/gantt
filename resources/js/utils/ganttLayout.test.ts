@@ -1,6 +1,6 @@
 import { type Task } from '@/types';
 import { ROW_HEIGHT } from '@/utils/gantt';
-import { collectParentIds, computeLayout, findTask, type LayoutOptions, type QuickCreateState } from '@/utils/ganttLayout';
+import { collectParentIds, computeLayout, expandAncestorIds, findTask, type LayoutOptions, type QuickCreateState } from '@/utils/ganttLayout';
 import { describe, expect, it } from 'vitest';
 
 let nextId = 1;
@@ -209,6 +209,20 @@ describe('collectParentIds', () => {
         expect(collectParentIds(buildTree(), 2)).toEqual([2]);
         // Level 3: nothing left to collapse → whole tree expands.
         expect(collectParentIds(buildTree(), 3)).toEqual([]);
+    });
+});
+
+describe('expandAncestorIds', () => {
+    it('returns parent ids from nearest to root', () => {
+        const root = makeTask({ id: 1, hierarchy_level: 1 });
+        const mid = child(root, { id: 2 });
+        const leaf = child(mid, { id: 3 });
+        mid.children = [leaf];
+        root.children = [mid];
+
+        expect(expandAncestorIds([root], 3)).toEqual([2, 1]);
+        expect(expandAncestorIds([root], 1)).toEqual([]);
+        expect(expandAncestorIds([root], 99)).toEqual([]);
     });
 });
 

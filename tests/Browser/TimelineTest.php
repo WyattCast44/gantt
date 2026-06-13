@@ -329,6 +329,56 @@ test('a conflicting schedule edit asks for confirmation before applying', functi
         ->and($pinned->refresh()->start_date->toDateString())->toBe('2026-01-12');
 });
 
+test('show in timeline focuses the task bar and selects the row', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    Task::factory()->forProject($project)->create([
+        'name' => 'Near task',
+        'start_date' => '2026-01-05',
+        'sort_order' => 1,
+    ]);
+    $far = Task::factory()->forProject($project)->create([
+        'name' => 'Distant mission',
+        'start_date' => '2028-06-01',
+        'duration_days' => 14,
+        'duration_unit' => DurationUnit::CalendarDays,
+        'sort_order' => 2,
+    ]);
+    actingAs($owner);
+
+    $page = visit("/projects/{$project->id}/timeline");
+    $page->assertSee('Distant mission');
+
+    $page->script("(() => { const el = document.querySelector('[data-testid=gantt-scroll]'); el.scrollLeft = el.scrollWidth; })()");
+    $page->click('[aria-label="Year view"]');
+    $page->wait(0.3);
+
+    $page->rightClick('Distant mission');
+    $page->click('Show in timeline');
+    $page->wait(0.3);
+
+    $taskId = $far->id;
+    $inView = $page->script(<<<JS
+        (() => {
+            const scroll = document.querySelector('[data-testid=gantt-scroll]');
+            const row = document.querySelector('#gantt-row-{$taskId}');
+            const bar = document.querySelector('[data-testid=task-bar-{$taskId}]');
+            if (!scroll || !row || !bar) {
+                return false;
+            }
+            const trackLeft = scroll.getBoundingClientRect().left + 320;
+            const trackRight = scroll.getBoundingClientRect().right;
+            const barRect = bar.getBoundingClientRect();
+            const selected = row.getAttribute('aria-selected') === 'true';
+            const inTrack = barRect.left >= trackLeft - 2 && barRect.right <= trackRight + 2;
+            return selected && inTrack;
+        })()
+    JS);
+
+    expect($inView)->toBeTrue();
+    $page->assertNoJavascriptErrors();
+});
+
 test('the timeline shows an empty state when there are no tasks', function () {
     $owner = User::factory()->create();
     $project = Project::factory()->withOwner($owner)->create();

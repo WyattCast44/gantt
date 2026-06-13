@@ -467,7 +467,7 @@ Future versions may support project cloning, branching schedules, and alternativ
 
 **FR-17.** Users shall be able to capture schedule baselines (snapshots) and compare the current schedule against a saved baseline.
 
-**FR-18.** The Gantt timeline shall support a keyboard-driven row selection model (click or arrow-key navigation, visible highlight) with hotkeys for creating, renaming, opening, and deleting tasks, for switching zoom scale (day/week/month/quarter/year), and for folding the tree to a uniform hierarchy depth (1–5).
+**FR-18.** The Gantt timeline shall support a keyboard-driven row selection model (click or arrow-key navigation, visible highlight) with hotkeys for creating, renaming, opening, and deleting tasks, for switching zoom scale (day/week/month/quarter/year), and for folding the tree to a uniform hierarchy depth (1–5), and for expanding/collapsing all tasks (E/C).
 
 **FR-19.** Users shall be able to create tasks and subtasks from the timeline by name alone via an inline draft row; all other fields receive smart defaults (context-anchored start date, 1 work-day duration) so every quick task immediately renders a bar. Enter chains the next draft for rapid scaffolding.
 
@@ -748,7 +748,7 @@ A new `selectedTaskId` lives in the Gantt store (`useGanttStore`).
 
 ### Hotkey map
 
-Added to the existing keydown handling in `GanttChart.tsx`, with the existing guards (ignore when an input/textarea/select/contenteditable is focused; ignore modified keys except where listed). Mutating keys are no-ops for viewers. No conflicts with existing D/W/M/Q/Y zoom, T (today), and 1–5 fold keys.
+Added to the existing keydown handling in `GanttChart.tsx`, with the existing guards (ignore when an input/textarea/select/contenteditable is focused; ignore modified keys except where listed). Mutating keys are no-ops for viewers. No conflicts with existing D/W/M/Q/Y zoom, T (today), 1–5 fold, and E/C expand-all/collapse-all keys.
 
 | Key | Action |
 |---|---|
@@ -762,6 +762,7 @@ Added to the existing keydown handling in `GanttChart.tsx`, with the existing gu
 | **Esc** | Cancel draft / rename / link mode first; otherwise clear selection |
 | **D / W / M / Q / Y** | Switch zoom scale: day / week / month / quarter / year |
 | **1 – 5** | Fold the tree to a uniform hierarchy depth (1 = top level only … 5 = fully expanded) |
+| **E / C** | Expand all / collapse all tasks |
 | **T** | Scroll to today |
 
 Hotkeys are discoverable via the existing `keyboard-shortcut` component: hints shown on context-menu items and in the timeline's shortcut legend alongside the zoom keys.
@@ -1143,7 +1144,7 @@ This section records what Phase 7 added on top of the Phase 1–6 + Activity-Log
 - **State engine (`stores/useGanttStore.ts`, Zustand):** holds `tasks`, `zoom`, `collapsed`, `viewportWidth`, an **extendable** `rangeStart`/`rangeEnd`, and `anchorToken`/`anchorScroll`; recomputes `layout` eagerly in each action. Actions: `init`, `setTasks`, `setZoom`, `setViewportWidth`, `extendRangeStart`/`extendRangeEnd` (infinite scroll), `goToWeek` (Today/jump), `reorderSiblings` (optimistic), `toggleCollapse`/`expandAll`/`collapseAll`/`foldToLevel` (uniform-depth fold for the 1–5 hotkeys).
 - **Pure modules:** `utils/gantt.ts` (integer-pixel geometry constants + date↔pixel helpers incl. `addDays`/`startOfWeek`/`endOfWeek`), `utils/ganttLayout.ts` (`computeLayout` → flat rows with `siblingIds`, `computeRange`, `reorderTree`, `collectParentIds` — takes an optional `minLevel` so the same walk powers both collapse-all and the uniform `foldToLevel` depth fold), `utils/ganttAxis.ts` (three-tier `buildAxis`: primary/secondary/tertiary bands with day/weekday/**week**/month/quarter/**fiscal-year** units, weekend flags), and `utils/date.ts`.
 - **Components (`Pages/Timeline/`):** `Show.tsx` (full-bleed page + store sync + empty state with a "New task" CTA), `GanttChart.tsx` (single scroll container; sticky three-tier axis header; sticky-left virtualized tree pane via `@tanstack/react-virtual`; toolbar with prev/Today/next, expand/collapse-all, zoom control), and partials `TimelineAxis`, `TaskBar`, `TaskBarTooltip`, `DependencyLayer` (FtS connector SVG), `WeekendBands`, `TodayLine` (dotted red current-day marker), `ZoomControl`, plus `barAppearance.ts`. Custom-pointer hooks: `useGanttDrag` (reschedule), `useGanttReorder` (sibling drag), and header click-drag panning — no DnD/gesture dependency.
-- **Interactions:** infinite horizontal scroll (range grows near either edge, left-extension compensated so there is no jump); header drag-to-pan; prev/next/Today buttons; keyboard hotkeys (`d/w/m/q/y` zoom, `1`–`5` uniform-depth fold, `t` Today). Bars show status fill, percent-complete, risk stripe, organization tag, and a manual-lock icon. Reorder shows a grip handle + drop indicator and up/down buttons (editors only).
+- **Interactions:** infinite horizontal scroll (range grows near either edge, left-extension compensated so there is no jump); header drag-to-pan; prev/next/Today buttons; keyboard hotkeys (`d/w/m/q/y` zoom, `1`–`5` uniform-depth fold, `e`/`c` expand-all/collapse-all, `t` Today). Bars show status fill, percent-complete, risk stripe, organization tag, and a manual-lock icon. Reorder shows a grip handle + drop indicator and up/down buttons (editors only).
 - **New dependencies:** `zustand`, `@tanstack/react-virtual` (frontend); `spatie/eloquent-sortable` (backend).
 - **Layout primitive:** `layouts/app-layout` gained a `fullBleed` mode so the Gantt fills the viewport (no centered max-width column).
 

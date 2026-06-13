@@ -566,7 +566,8 @@ test('marking a parent complete requires including incomplete subtasks', functio
     $this->actingAs($owner)->post(route('projects.tasks.complete', [$project, $parent]))
         ->assertInvalid('include_subtasks');
 
-    expect($parent->fresh()->status)->toBe(TaskStatus::InProgress);
+    // The parent's status is derived from its (still not-started) child.
+    expect($parent->fresh()->status)->toBe(TaskStatus::NotStarted);
 });
 
 test('an editor can mark a parent and its subtree complete', function () {
@@ -584,6 +585,110 @@ test('an editor can mark a parent and its subtree complete', function () {
         ->and($child->fresh()->status)->toBe(TaskStatus::Complete)
         ->and($grandchild->fresh()->status)->toBe(TaskStatus::Complete)
         ->and($grandchild->fresh()->percent_complete)->toBe(100);
+});
+
+test('a parent rolls up the average percent complete of its children', function () {
+    $project = Project::factory()->create();
+    $parent = Task::factory()->forProject($project)->create();
+    $a = Task::factory()->forProject($project)->child($parent)->create(['percent_complete' => 0, 'status' => TaskStatus::NotStarted]);
+    Task::factory()->forProject($project)->child($parent)->create(['percent_complete' => 0, 'status' => TaskStatus::NotStarted]);
+
+    $a->update(['percent_complete' => 100, 'status' => TaskStatus::Complete]);
+
+    expect($parent->fresh())
+        ->percent_complete->toBe(50)
+        ->status->toBe(TaskStatus::InProgress);
+});
+
+test('a parent is complete only when every child is, and never rounds up to 100', function () {
+    $project = Project::factory()->create();
+    $parent = Task::factory()->forProject($project)->create();
+    $a = Task::factory()->forProject($project)->child($parent)->create(['percent_complete' => 99, 'status' => TaskStatus::InProgress]);
+    Task::factory()->forProject($project)->child($parent)->create(['percent_complete' => 100, 'status' => TaskStatus::Complete]);
+
+    // avg(99, 100) = 99.5 → would round to 100, but a still-open parent is clamped to 99.
+    expect($parent->fresh())
+        ->percent_complete->toBe(99)
+        ->status->toBe(TaskStatus::InProgress);
+
+    $a->update(['percent_complete' => 100, 'status' => TaskStatus::Complete]);
+
+    expect($parent->fresh())
+        ->percent_complete->toBe(100)
+        ->status->toBe(TaskStatus::Complete);
+});
+
+test('a leaf change rolls up through every ancestor to the root', function () {
+    $project = Project::factory()->create();
+    $root = Task::factory()->forProject($project)->create();
+    $mid = Task::factory()->forProject($project)->child($root)->create(['percent_complete' => 0, 'status' => TaskStatus::NotStarted]);
+    $leaf = Task::factory()->forProject($project)->child($mid)->create(['percent_complete' => 0, 'status' => TaskStatus::NotStarted]);
+
+    $leaf->update(['percent_complete' => 100, 'status' => TaskStatus::Complete]);
+
+    expect($mid->fresh()->status)->toBe(TaskStatus::Complete)
+        ->and($root->fresh()->status)->toBe(TaskStatus::Complete)
+        ->and($root->fresh()->percent_complete)->toBe(100);
+});
+
+test('adding a fresh child drops a previously complete parent', function () {
+    $project = Project::factory()->create();
+    $parent = Task::factory()->forProject($project)->create();
+    Task::factory()->forProject($project)->child($parent)->create(['percent_complete' => 100, 'status' => TaskStatus::Complete]);
+
+    expect($parent->fresh()->status)->toBe(TaskStatus::Complete);
+
+    Task::factory()->forProject($project)->child($parent)->create(['percent_complete' => 0, 'status' => TaskStatus::NotStarted]);
+
+    expect($parent->fresh())
+        ->percent_complete->toBe(50)
+        ->status->toBe(TaskStatus::InProgress);
+});
+
+test('deleting the last incomplete child lifts the parent to complete', function () {
+    $project = Project::factory()->create();
+    $parent = Task::factory()->forProject($project)->create();
+    Task::factory()->forProject($project)->child($parent)->create(['percent_complete' => 100, 'status' => TaskStatus::Complete]);
+    $straggler = Task::factory()->forProject($project)->child($parent)->create(['percent_complete' => 0, 'status' => TaskStatus::NotStarted]);
+
+    expect($parent->fresh()->status)->toBe(TaskStatus::InProgress);
+
+    $straggler->delete();
+
+    expect($parent->fresh()->status)->toBe(TaskStatus::Complete);
+});
+
+test('the update endpoint rejects a manual progress change on a parent but accepts the derived values', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $parent = Task::factory()->forProject($project)->create();
+    Task::factory()->forProject($project)->child($parent)->create(['percent_complete' => 40, 'status' => TaskStatus::InProgress]);
+    $parent->refresh();
+
+    // Resubmit the parent's own (derived) schedule so only progress is in play.
+    $schedule = [
+        'start_date' => $parent->start_date?->toDateString(),
+        'duration_days' => $parent->duration_days,
+        'duration_unit' => $parent->duration_unit->value,
+        'lock_start' => $parent->lock_start,
+        'lock_end' => $parent->lock_end,
+        'lock_duration' => $parent->lock_duration,
+    ];
+
+    $this->actingAs($owner)->patch(route('projects.tasks.update', [$project, $parent]), taskPayload([
+        ...$schedule,
+        'status' => TaskStatus::Complete->value,
+        'percent_complete' => 80,
+    ]))->assertInvalid('percent_complete');
+
+    $this->actingAs($owner)->patch(route('projects.tasks.update', [$project, $parent]), taskPayload([
+        ...$schedule,
+        'name' => 'Renamed parent',
+        'status' => $parent->status->value,
+        'percent_complete' => $parent->percent_complete,
+    ]))->assertValid();
+
+    expect($parent->fresh()->name)->toBe('Renamed parent');
 });
 
 test('a viewer cannot mark a task complete', function () {

@@ -87,9 +87,59 @@ export function endOfWeek(iso: string): string {
     return addDays(startOfWeek(iso), 6);
 }
 
+/** Horizontal padding fraction when framing a task bar in the viewport. */
+export const FOCUS_PADDING_RATIO = 0.15;
+
 /** Whole calendar days spanned inclusively between two dates (>= 1). */
 export function inclusiveDaySpan(startIso: string, endIso: string): number {
     return Math.max(1, dayOffset(parseDay(endIso), parseDay(startIso)) + 1);
+}
+
+/**
+ * Pick the finest zoom where a task's day span fits in the bar-track viewport
+ * (with padding) and the hierarchy level remains visible at that zoom.
+ * Falls back to the coarsest depth-compatible zoom when the span is too long.
+ */
+export function zoomToFitSpan(
+    spanDays: number,
+    viewportWidth: number,
+    minDepth: number,
+    paddingRatio: number = FOCUS_PADDING_RATIO,
+): ZoomLevel {
+    const availableWidth = Math.max(0, viewportWidth * (1 - 2 * paddingRatio));
+
+    for (const level of ZOOM_LEVELS) {
+        if (ZOOM_CONFIG[level].maxDepth >= minDepth && spanDays * ZOOM_CONFIG[level].dayWidth <= availableWidth) {
+            return level;
+        }
+    }
+
+    for (const level of [...ZOOM_LEVELS].reverse()) {
+        if (ZOOM_CONFIG[level].maxDepth >= minDepth) {
+            return level;
+        }
+    }
+
+    return 'day';
+}
+
+/**
+ * Horizontal scrollLeft that frames a task bar in the bar-track viewport.
+ * Centers the bar when it is wider than the viewport.
+ */
+export function focusScrollLeft(
+    barX: number,
+    barWidth: number,
+    trackViewport: number,
+    paddingRatio: number = FOCUS_PADDING_RATIO,
+): number {
+    const padding = trackViewport * paddingRatio;
+
+    if (barWidth + 2 * padding <= trackViewport) {
+        return Math.max(0, barX - padding);
+    }
+
+    return Math.max(0, barX + barWidth / 2 - trackViewport / 2);
 }
 
 /** Total grid width in pixels for a date range at a given zoom. */

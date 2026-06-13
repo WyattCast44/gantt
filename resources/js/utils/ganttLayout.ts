@@ -254,6 +254,27 @@ export function findTask(roots: Task[], id: number | null): Task | null {
 }
 
 /**
+ * Parent ids to expand so `taskId` is visible in the tree (nearest ancestor first).
+ */
+export function expandAncestorIds(roots: Task[], taskId: number): number[] {
+    const task = findTask(roots, taskId);
+
+    if (task === null) {
+        return [];
+    }
+
+    const ids: number[] = [];
+    let parentId = task.parent_id;
+
+    while (parentId !== null) {
+        ids.push(parentId);
+        parentId = findTask(roots, parentId)?.parent_id ?? null;
+    }
+
+    return ids;
+}
+
+/**
  * Return a new tree with one sibling group reordered to match `orderedIds`.
  * `parentId === null` reorders the roots; otherwise it reorders that parent's
  * children. Pure — used for the optimistic reorder before the server confirms.

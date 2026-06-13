@@ -69,6 +69,9 @@ export default function TaskForm({
     // A parent's schedule is the engine-derived envelope of its children; the
     // backend rejects direct edits, so the form shows it read-only.
     const scheduleIsDerived = editing && task.children.length > 0;
+    // Likewise a parent's status/percent are the derived average of its
+    // children, so they are shown read-only rather than as editable controls.
+    const progressIsDerived = editing && task.children.length > 0;
 
     const form = useForm<TaskFormData>({
         name: task?.name ?? '',
@@ -249,14 +252,23 @@ export default function TaskForm({
                     />
                 )}
 
-                <FieldRow label="Status" htmlFor="task-status" required>
-                    <Select id="task-status" value={form.data.status} onChange={(event) => form.setData('status', event.target.value as TaskStatusValue)}>
-                        {TASK_STATUSES.map((option) => (
-                            <option key={option.value} value={option.value}>
-                                {option.label}
-                            </option>
-                        ))}
-                    </Select>
+                <FieldRow label="Status" htmlFor={progressIsDerived ? undefined : 'task-status'} required={!progressIsDerived}>
+                    {progressIsDerived ? (
+                        <div data-testid="task-progress-derived">
+                            <p className="text-sm text-slate-900 dark:text-white">{task.status.label}</p>
+                            <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
+                                Derived from this task's subtasks — update the subtasks to change it.
+                            </p>
+                        </div>
+                    ) : (
+                        <Select id="task-status" value={form.data.status} onChange={(event) => form.setData('status', event.target.value as TaskStatusValue)}>
+                            {TASK_STATUSES.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </Select>
+                    )}
                     <InputError message={form.errors.status} className="mt-1" />
                 </FieldRow>
 
@@ -276,7 +288,9 @@ export default function TaskForm({
                         <div data-testid="task-percent-readonly">
                             <p className="text-sm text-slate-900 dark:text-white">{task.percent_complete}%</p>
                             <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
-                                Use Update progress in the task header to change this value.
+                                {progressIsDerived
+                                    ? "Derived from this task's subtasks — update the subtasks to change it."
+                                    : 'Use Update progress in the task header to change this value.'}
                             </p>
                         </div>
                     ) : (

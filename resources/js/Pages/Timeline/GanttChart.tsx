@@ -17,7 +17,7 @@ import { useDependencyLinking } from '@/Pages/Timeline/useDependencyLinking';
 import { useGanttDrag } from '@/Pages/Timeline/useGanttDrag';
 import { useGanttReorder } from '@/Pages/Timeline/useGanttReorder';
 import { useQuickCreate } from '@/Pages/Timeline/useQuickCreate';
-import { destroy as taskDestroy, rename as taskRename, show as taskShow } from '@/routes/projects/tasks';
+import { complete as taskComplete, destroy as taskDestroy, rename as taskRename, show as taskShow } from '@/routes/projects/tasks';
 import { destroy as dependencyDestroy } from '@/routes/projects/tasks/dependencies';
 import { useGanttStore } from '@/stores/useGanttStore';
 import { type Task } from '@/types';
@@ -60,6 +60,11 @@ const ZOOM_HOTKEYS: Record<string, ZoomLevel> = {
     y: 'year',
 };
 
+/** True when any descendant of `task` is not yet complete (drives the subtask-cascade label/payload). */
+function hasIncompleteDescendants(task: Task): boolean {
+    return task.children.some((child) => child.status.value !== 'complete' || hasIncompleteDescendants(child));
+}
+
 /** Apply the live drag delta to a bar so it previews where it will land. */
 function previewBar(bar: BarMetrics, drag: DragState, dayWidth: number): BarMetrics {
     if (drag.mode === 'move') {
@@ -81,6 +86,9 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
     const extendRangeStart = useGanttStore((state) => state.extendRangeStart);
     const extendRangeEnd = useGanttStore((state) => state.extendRangeEnd);
     const goToWeek = useGanttStore((state) => state.goToWeek);
+    const focusTask = useGanttStore((state) => state.focusTask);
+    const focusToken = useGanttStore((state) => state.focusToken);
+    const focusRowIndex = useGanttStore((state) => state.focusRowIndex);
     const anchorToken = useGanttStore((state) => state.anchorToken);
     const anchorScroll = useGanttStore((state) => state.anchorScroll);
     const selectedTaskId = useGanttStore((state) => state.selectedTaskId);
@@ -219,6 +227,14 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
             scrollRef.current.scrollLeft = anchorScroll;
         }
     }, [anchorToken, anchorScroll]);
+
+    // Scroll the focused task row into the vertical viewport.
+    useLayoutEffect(() => {
+        if (focusRowIndex !== null) {
+            virtualizer.scrollToIndex(virtualIndexOf(focusRowIndex));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [focusToken]);
 
     // Re-apply scroll after a zoom change rescales the timeline width.
     useLayoutEffect(() => {
@@ -449,6 +465,17 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
         });
     };
 
+    const markComplete = (task: Task, includeSubtasks: boolean): void => {
+        router.post(
+            taskComplete.url([projectId, task.id]),
+            { include_subtasks: includeSubtasks },
+            {
+                preserveScroll: true,
+                preserveState: true,
+            },
+        );
+    };
+
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent): void => {
             if (event.metaKey || event.ctrlKey || event.altKey || deleting !== null) {
@@ -483,6 +510,20 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
                 if (key >= '1' && key <= String(MAX_TASK_DEPTH)) {
                     event.preventDefault();
                     foldToLevel(Number(key));
+
+                    return;
+                }
+
+                if (key === 'e') {
+                    event.preventDefault();
+                    expandAll();
+
+                    return;
+                }
+
+                if (key === 'c') {
+                    event.preventDefault();
+                    collapseAll();
 
                     return;
                 }
@@ -576,6 +617,33 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
             <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-6 py-2.5 dark:border-border-dark">
                 <div className="flex items-center gap-3">
                     <ShortcutsHelp canEdit={canEdit} />
+                    {canEdit && (
+                        <Tooltip label="Add a task below the selection — or press N">
+                            <Button
+                                size="sm"
+                                onClick={openNewTaskDraft}
+                                data-testid="toolbar-new-task"
+                                className="h-8 py-0"
+                            >
+                                <Plus className="mr-1.5 h-4 w-4" aria-hidden />
+                                New task
+                            </Button>
+                        </Tooltip>
+                    )}
+                    <ToolbarButtonGroup aria-label="Task tree">
+                        <ToolbarTooltip label="Expand all tasks">
+                            <ToolbarGroupButton onClick={expandAll} className={toolbarSegmentClass(false)}>
+                                Expand all
+                            </ToolbarGroupButton>
+                        </ToolbarTooltip>
+                        <ToolbarTooltip label="Collapse all tasks">
+                            <ToolbarGroupButton onClick={collapseAll} className={toolbarSegmentClass(true)}>
+                                Collapse all
+                            </ToolbarGroupButton>
+                        </ToolbarTooltip>
+                    </ToolbarButtonGroup>
+                </div>
+                <div className="flex items-center gap-3">
                     <ToolbarButtonGroup aria-label="Timeline navigation">
                         <ToolbarTooltip label="Scroll backward">
                             <ToolbarGroupButton
@@ -605,33 +673,6 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
                             </ToolbarGroupButton>
                         </ToolbarTooltip>
                     </ToolbarButtonGroup>
-                    <ToolbarButtonGroup aria-label="Task tree">
-                        <ToolbarTooltip label="Expand all tasks">
-                            <ToolbarGroupButton onClick={expandAll} className={toolbarSegmentClass(false)}>
-                                Expand all
-                            </ToolbarGroupButton>
-                        </ToolbarTooltip>
-                        <ToolbarTooltip label="Collapse all tasks">
-                            <ToolbarGroupButton onClick={collapseAll} className={toolbarSegmentClass(true)}>
-                                Collapse all
-                            </ToolbarGroupButton>
-                        </ToolbarTooltip>
-                    </ToolbarButtonGroup>
-                </div>
-                <div className="flex items-center gap-3">
-                    {canEdit && (
-                        <Tooltip label="Add a task below the selection — or press N">
-                            <Button
-                                size="sm"
-                                onClick={openNewTaskDraft}
-                                data-testid="toolbar-new-task"
-                                className="h-8 py-0"
-                            >
-                                <Plus className="mr-1.5 h-4 w-4" aria-hidden />
-                                New task
-                            </Button>
-                        </Tooltip>
-                    )}
                     <ZoomControl zoom={zoom} onChange={changeZoom} />
                 </div>
             </div>
@@ -991,6 +1032,13 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
                             <ContextMenuItem shortcut="F2" onSelect={() => startRename(menu.task)}>
                                 Rename
                             </ContextMenuItem>
+                            <ContextMenuItem
+                                disabled={menu.task.status.value === 'complete' && !hasIncompleteDescendants(menu.task)}
+                                disabledReason="This task is already complete."
+                                onSelect={() => markComplete(menu.task, hasIncompleteDescendants(menu.task))}
+                            >
+                                {hasIncompleteDescendants(menu.task) ? 'Mark complete with subtasks' : 'Mark complete'}
+                            </ContextMenuItem>
                             <ContextMenuSeparator />
                             <ContextMenuItem onSelect={() => startClickLink(menu.task.id)}>Link to successor…</ContextMenuItem>
                             <ContextMenuSub label="Dependencies">
@@ -1011,6 +1059,7 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
                             <ContextMenuSeparator />
                         </>
                     )}
+                    <ContextMenuItem onSelect={() => focusTask(menu.task.id)}>Show in timeline</ContextMenuItem>
                     <ContextMenuItem shortcut="↵" onSelect={() => router.visit(taskShow.url([projectId, menu.task.id]))}>
                         Open details
                     </ContextMenuItem>

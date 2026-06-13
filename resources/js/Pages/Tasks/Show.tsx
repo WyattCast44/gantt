@@ -492,6 +492,8 @@ export default function Show({
     const [percentOpen, setPercentOpen] = useState(false);
 
     const isComplete = task.status.value === 'complete';
+    // A parent's progress is derived from its subtasks, so it isn't hand-edited.
+    const progressIsDerived = (task.children?.length ?? 0) > 0;
 
     const comments = task.comments ?? [];
     const activities = task.activities ?? [];
@@ -567,9 +569,11 @@ export default function Show({
 
                     {canEdit && (
                         <div className="flex shrink-0 flex-wrap items-center gap-2">
-                            <Button variant="secondary" onClick={() => setPercentOpen(true)}>
-                                Update progress
-                            </Button>
+                            {!progressIsDerived && (
+                                <Button variant="secondary" onClick={() => setPercentOpen(true)}>
+                                    Update progress
+                                </Button>
+                            )}
                             {!isComplete && (
                                 <Button onClick={requestComplete} disabled={completeForm.processing}>
                                     <CheckCircle2 className="mr-2 h-4 w-4" aria-hidden />

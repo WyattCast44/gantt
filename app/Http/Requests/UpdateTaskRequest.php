@@ -74,6 +74,13 @@ class UpdateTaskRequest extends FormRequest
                     );
                 }
 
+                if ($this->changesParentProgress()) {
+                    $validator->errors()->add(
+                        'percent_complete',
+                        'Progress on a task with subtasks is derived from its children.',
+                    );
+                }
+
                 $project = $this->route('project');
                 $marking = $this->input('base_classification');
 
@@ -132,5 +139,22 @@ class UpdateTaskRequest extends FormRequest
             || $this->boolean('lock_start') !== $task->lock_start
             || $this->boolean('lock_end') !== $task->lock_end
             || $this->boolean('lock_duration') !== $task->lock_duration;
+    }
+
+    /**
+     * Whether the request would alter a parent task's progress. A parent's
+     * status/percent are the derived average of its children, so only actual
+     * changes are rejected — resubmitting the derived values is fine.
+     */
+    private function changesParentProgress(): bool
+    {
+        $task = $this->route('task');
+
+        if (! $task instanceof Task || ! $task->children()->exists()) {
+            return false;
+        }
+
+        return (string) $this->input('status') !== $task->status->value
+            || (int) $this->input('percent_complete') !== $task->percent_complete;
     }
 }

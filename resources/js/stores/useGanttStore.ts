@@ -12,12 +12,13 @@
  */
 
 import { type Task } from '@/types';
-import { addDays, dayOffset, endOfWeek, inclusiveDaySpan, parseDay, startOfWeek, ZOOM_LEVELS, type ZoomLevel, ZOOM_CONFIG } from '@/utils/gantt';
+import { addDays, barMetrics, dayOffset, endOfWeek, focusScrollLeft, inclusiveDaySpan, parseDay, startOfWeek, ZOOM_LEVELS, type ZoomLevel, ZOOM_CONFIG, zoomToFitSpan } from '@/utils/gantt';
 import {
     collectParentIds,
     computeLayout,
     computeRange,
     type DraftPosition,
+    expandAncestorIds,
     findTask,
     type GanttLayout,
     type QuickCreateState,
@@ -46,6 +47,9 @@ type GanttState = {
     anchorToken: number;
     /** Initial scrollLeft (px) that places the data start at the left edge. */
     anchorScroll: number;
+    /** Bumped when focusTask scrolls a row into view vertically. */
+    focusToken: number;
+    focusRowIndex: number | null;
     /** The keyboard/click row selection (hotkeys act on this task). */
     selectedTaskId: number | null;
     /** Active quick-create block (pending placeholders + input row), or null. */
@@ -62,6 +66,8 @@ type GanttState = {
     extendRangeEnd: (days: number) => void;
     /** Scroll the viewport to the week containing `iso` (Monday–Sunday). */
     goToWeek: (iso: string) => void;
+    /** Reveal a task in the tree and frame its bar in the viewport. */
+    focusTask: (taskId: number) => void;
     /** Optimistically reorder a sibling group (parentId null = roots). */
     reorderSiblings: (parentId: number | null, orderedIds: number[]) => void;
     toggleCollapse: (id: number) => void;
@@ -147,6 +153,8 @@ export const useGanttStore = create<GanttState>((set, get) => ({
     rangeEnd: '',
     anchorToken: 0,
     anchorScroll: 0,
+    focusToken: 0,
+    focusRowIndex: null,
     selectedTaskId: null,
     quick: null,
     linking: null,
@@ -293,6 +301,85 @@ export const useGanttStore = create<GanttState>((set, get) => ({
             anchorToken: get().anchorToken + 1,
             anchorScroll,
             layout: layoutFor({ tasks, zoom, collapsed, rangeStart, rangeEnd, quick: get().quick }),
+        });
+    },
+
+    focusTask: (taskId) => {
+        const state = get();
+        const task = findTask(state.tasks, taskId);
+
+        if (task === null) {
+            return;
+        }
+
+        const collapsed = new Set(state.collapsed);
+
+        for (const id of expandAncestorIds(state.tasks, taskId)) {
+            collapsed.delete(id);
+        }
+
+        const { tasks, viewportWidth, quick } = state;
+        let zoom = state.zoom;
+
+        if (task.hierarchy_level > ZOOM_CONFIG[zoom].maxDepth) {
+            zoom = [...ZOOM_LEVELS].reverse().find((candidate) => ZOOM_CONFIG[candidate].maxDepth >= task.hierarchy_level) ?? 'day';
+        }
+
+        let rangeStart = state.rangeStart;
+        let rangeEnd = state.rangeEnd;
+        let anchorScroll = state.anchorScroll;
+        let anchorToken = state.anchorToken;
+
+        if (task.start_date === null) {
+            const layout = layoutFor({ tasks, zoom, collapsed, rangeStart, rangeEnd, quick });
+            const rowIndex = layout.rows.findIndex((row) => row.task.id === taskId);
+
+            set({
+                collapsed,
+                zoom,
+                selectedTaskId: taskId,
+                focusRowIndex: rowIndex === -1 ? null : rowIndex,
+                focusToken: state.focusToken + 1,
+                layout,
+            });
+
+            return;
+        }
+
+        const taskEnd = task.end_date ?? task.start_date;
+        zoom = zoomToFitSpan(inclusiveDaySpan(task.start_date, taskEnd), viewportWidth, task.hierarchy_level);
+
+        if (rangeStart === '' || task.start_date < rangeStart) {
+            rangeStart = addDays(task.start_date, -PAD_DAYS);
+        }
+
+        if (rangeEnd === '' || taskEnd > rangeEnd) {
+            rangeEnd = later(rangeEnd || taskEnd, fillToViewport(rangeStart, addDays(taskEnd, PAD_DAYS), zoom, viewportWidth));
+        } else {
+            rangeEnd = fillToViewport(rangeStart, rangeEnd, zoom, viewportWidth);
+        }
+
+        const bar = barMetrics(task.start_date, taskEnd, rangeStart, zoom);
+
+        if (bar !== null) {
+            anchorScroll = focusScrollLeft(bar.x, bar.width, viewportWidth);
+            anchorToken += 1;
+        }
+
+        const layout = layoutFor({ tasks, zoom, collapsed, rangeStart, rangeEnd, quick });
+        const rowIndex = layout.rows.findIndex((row) => row.task.id === taskId);
+
+        set({
+            collapsed,
+            zoom,
+            rangeStart,
+            rangeEnd,
+            anchorScroll,
+            anchorToken,
+            selectedTaskId: taskId,
+            focusRowIndex: rowIndex === -1 ? null : rowIndex,
+            focusToken: state.focusToken + 1,
+            layout,
         });
     },
 

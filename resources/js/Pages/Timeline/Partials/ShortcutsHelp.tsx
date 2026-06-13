@@ -61,6 +61,7 @@ export default function ShortcutsHelp({ canEdit }: { canEdit: boolean }) {
                 <ShortcutRow keys={['T']}>Go to today</ShortcutRow>
                 <ShortcutRow keys={['D', 'W', 'M', 'Q', 'Y']}>Zoom: day / week / month / quarter / year</ShortcutRow>
                 <ShortcutRow keys={['1', '–', '5']}>Fold tree to hierarchy level 1–5</ShortcutRow>
+                <ShortcutRow keys={['E', 'C']}>Expand all / collapse all tasks</ShortcutRow>
                 <DropdownMenuSeparator />
                 <div className="px-3 py-1.5 text-xs text-slate-500 dark:text-neutral-400">
                     Tip: right-click tasks, bars, empty space, or dependency lines for more actions.

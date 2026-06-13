@@ -112,6 +112,21 @@ class Task extends Model implements Sortable
             }
         });
 
+        // Roll progress up to the parent: its percent/status are the derived
+        // average of its children. A new child shifts the average; an updated
+        // child only matters when its progress moved. Recomputing the parent
+        // updates it in turn, so the roll-up walks the parent_id chain to the
+        // root. The parent is resolved by id (lazy loading is disabled app-wide).
+        static::created(function (Task $task): void {
+            $task->rollUpToParent();
+        });
+
+        static::updated(function (Task $task): void {
+            if ($task->wasChanged('percent_complete') || $task->wasChanged('status')) {
+                $task->rollUpToParent();
+            }
+        });
+
         static::deleting(function (Task $task): void {
             if ($task->isForceDeleting()) {
                 return;
@@ -121,6 +136,61 @@ class Task extends Model implements Sortable
 
             $task->children->each(fn (Task $child) => $child->delete());
         });
+
+        // Removing a child changes the parent's average; recompute it.
+        static::deleted(function (Task $task): void {
+            $task->rollUpToParent();
+        });
+    }
+
+    /**
+     * Recompute this task's parent (if any) from its children. Resolves the
+     * parent by id rather than the relation so it works under disabled lazy
+     * loading and reflects the current persisted child set.
+     */
+    private function rollUpToParent(): void
+    {
+        if ($this->parent_id !== null) {
+            static::find($this->parent_id)?->recomputeProgressFromChildren();
+        }
+    }
+
+    /**
+     * Recompute this (parent) task's progress from the simple average of its
+     * direct children — completion rolls up the hierarchy. A task with no
+     * children is a leaf and keeps its own manually-entered values.
+     */
+    public function recomputeProgressFromChildren(): void
+    {
+        $children = $this->children()->get(['id', 'percent_complete', 'status']);
+
+        if ($children->isEmpty()) {
+            return;
+        }
+
+        $percent = (int) round($children->avg('percent_complete'));
+
+        $allComplete = $children->every(fn (Task $child): bool => $child->status === TaskStatus::Complete);
+        $allNotStarted = $children->every(fn (Task $child): bool => $child->percent_complete === 0);
+
+        if ($allComplete) {
+            $status = TaskStatus::Complete;
+        } elseif ($allNotStarted) {
+            $status = TaskStatus::NotStarted;
+        } else {
+            $status = TaskStatus::InProgress;
+            // "100%" must always mean done: never round a still-open parent to 100.
+            $percent = min($percent, 99);
+        }
+
+        if ($this->percent_complete === $percent && $this->status === $status) {
+            return;
+        }
+
+        $this->update([
+            'percent_complete' => $percent,
+            'status' => $status,
+        ]);
     }
 
     /**

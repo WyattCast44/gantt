@@ -38,6 +38,7 @@ export default function TaskBar({ task, bar, interactive = false, dragging = fal
                 style={{ left: bar.x, width: bar.width, top: VERTICAL_PADDING, height: BAR_HEIGHT }}
             >
                 <div
+                    data-testid={`task-bar-${task.id}`}
                     className={cn(
                         'relative flex h-full w-full items-center overflow-hidden rounded-sm select-none',
                         palette.track,
