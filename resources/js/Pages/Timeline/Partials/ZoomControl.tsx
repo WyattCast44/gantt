@@ -1,5 +1,5 @@
-import { Tooltip } from '@/components/ui/tooltip';
-import { ZOOM_CONFIG, ZOOM_LEVELS, type ZoomLevel } from '@/utils/gantt';
+import { toolbarGroupClass, ToolbarTooltip } from '@/Pages/Timeline/Partials/ToolbarButtonGroup';
+import { ZOOM_LEVELS, type ZoomLevel } from '@/utils/gantt';
 import { cn } from '@/utils/cn';
 import { focusRingNeutral } from '@/utils/focusRing';
 
@@ -8,29 +8,38 @@ type ZoomControlProps = {
     onChange: (zoom: ZoomLevel) => void;
 };
 
-const ZOOM_TOOLTIPS: Record<ZoomLevel, string> = {
-    day: 'Day view (D)',
-    month: 'Month view (M)',
-    quarter: 'Quarter view (Q)',
-    year: 'Year view (Y)',
+const ZOOM_SHORT_LABELS: Record<ZoomLevel, string> = {
+    day: 'D',
+    week: 'W',
+    month: 'M',
+    quarter: 'Q',
+    year: 'Y',
 };
 
-/** Segmented control switching the timeline time-scale (day/month/quarter/year). */
+const ZOOM_TOOLTIPS: Record<ZoomLevel, string> = {
+    day: 'Day view',
+    week: 'Week view',
+    month: 'Month view',
+    quarter: 'Quarter view',
+    year: 'Year view',
+};
+
+/** Segmented control switching the timeline time-scale (day/week/month/quarter/year). */
 export default function ZoomControl({ zoom, onChange }: ZoomControlProps) {
     return (
-        <div className="inline-flex overflow-hidden rounded-md border border-border dark:border-border-dark" role="group" aria-label="Zoom level">
+        <div className={toolbarGroupClass} role="group" aria-label="Zoom level">
             {ZOOM_LEVELS.map((level, index) => {
                 const active = level === zoom;
 
                 return (
-                    <Tooltip key={level} label={ZOOM_TOOLTIPS[level]} className="flex">
+                    <ToolbarTooltip key={level} label={ZOOM_TOOLTIPS[level]}>
                         <button
                             type="button"
                             aria-pressed={active}
                             aria-label={ZOOM_TOOLTIPS[level]}
                             onClick={() => onChange(level)}
                             className={cn(
-                                'cursor-pointer px-3 py-1.5 text-xs font-medium transition',
+                                'flex h-full min-w-8 cursor-pointer items-center justify-center px-2.5 py-0 text-xs leading-none font-semibold transition',
                                 index < ZOOM_LEVELS.length - 1 && 'border-r border-border dark:border-border-dark',
                                 focusRingNeutral,
                                 active
@@ -38,9 +47,9 @@ export default function ZoomControl({ zoom, onChange }: ZoomControlProps) {
                                     : 'bg-white text-slate-600 hover:bg-slate-50 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700',
                             )}
                         >
-                            {ZOOM_CONFIG[level].label}
+                            {ZOOM_SHORT_LABELS[level]}
                         </button>
-                    </Tooltip>
+                    </ToolbarTooltip>
                 );
             })}
         </div>

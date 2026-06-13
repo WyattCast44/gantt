@@ -358,6 +358,20 @@ test('deleting a task soft-deletes its whole subtree', function () {
         ->and(Task::withTrashed()->find($grandchild->id)->trashed())->toBeTrue();
 });
 
+test('deleting from the timeline redirects back to the timeline', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $task = Task::factory()->forProject($project)->create();
+
+    $this->actingAs($owner)
+        ->from(route('projects.timeline', $project))
+        ->delete(route('projects.tasks.destroy', [$project, $task]), ['from' => 'timeline'])
+        ->assertRedirect(route('projects.timeline', $project))
+        ->assertSessionHas('status', 'Task deleted.');
+
+    expect(Task::withTrashed()->find($task->id)->trashed())->toBeTrue();
+});
+
 test('the derived end date is start plus duration at calendar-day grain', function () {
     $task = Task::factory()->create([
         'start_date' => '2026-03-01',

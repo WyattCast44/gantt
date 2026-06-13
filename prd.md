@@ -2,7 +2,7 @@
 
 Operational Test Timeline & Dependency Management Platform
 
-_Version 15 - Phases 1–8 Implemented (Architecture, Auth & RBAC, Project Topologies + Workspace Shell + Membership, Document Ingestion, Polymorphic Commenting, Activity-Logging Foundation, Task Core Lifecycle + Temporal Logic + Domain Event Bus + Dependencies, UI Design System + Gantt State Engine, Schedule Rules Engine). Phase 8 delivered automatic push-only date propagation along finish-to-start dependencies with a dry-run/confirm protocol, the target 3-lock model (independent start/end/duration locks, max two of three — replacing `is_date_locked`), engine-derived parent roll-up envelopes, hierarchy-aware cycle detection, and derived schedule-conflict surfacing (red dashed dependency lines + warning badges). Phase 9 (Timeline Quick Authoring & On-Chart Dependency Editing) is specified below — see the "Phase 9 Specification" section._
+_Version 15 - Phases 1–8 Implemented (Architecture, Auth & RBAC, Project Topologies + Workspace Shell + Membership, Document Ingestion, Polymorphic Commenting, Activity-Logging Foundation, Task Core Lifecycle + Temporal Logic + Domain Event Bus + Dependencies, UI Design System + Gantt State Engine, Schedule Rules Engine). Phase 8 delivered automatic push-only date propagation along finish-to-start dependencies with a dry-run/confirm protocol, the target 3-lock model (independent start/end/duration locks, max two of three — replacing `is_date_locked`), engine-derived parent roll-up envelopes, hierarchy-aware cycle detection, and derived schedule-conflict surfacing (red dashed dependency lines + warning badges). Phase 9 (Timeline Quick Authoring & On-Chart Dependency Editing) is specified below — see the "Phase 9 Specification" section. Subsequent timeline enhancements: a **week** zoom scale for medium-range scheduling (between day and month) and **uniform-depth fold hotkeys (1–5)** that collapse the tree to a chosen hierarchy level on demand._
 
 # Overview
 
@@ -203,7 +203,7 @@ Users must be able to:
 The application shall provide:
 
 - Interactive Gantt timeline
-- Zoom levels: day, month, quarter, and year
+- Zoom levels: day, week, month, quarter, and year
 - Horizontal scrolling
 - Dependency visualization lines
 - Drag-and-drop timeline adjustments
@@ -214,6 +214,8 @@ The application shall provide:
 ### Zoom-Adaptive Level of Detail
 
 - **\[V1 DECISION\]** The Gantt chart shall behave like a slippy web map (e.g., Google Maps): the level of detail adapts to the zoom level. As the user zooms out, lower-level subtasks progressively fold/hide so only higher-level parent tasks remain visible. As the user zooms in, subtasks and additional details progressively reappear.
+- **\[ENHANCEMENT\]** A **week** zoom scale sits between day and month for medium-range scheduling — day grain is too narrow to fit a planning horizon on one screen, month grain hides too much week-to-week detail. The week scale renders ~16 px/day (≈3 months on a typical screen) with a `month → week-start-date → weekday` header, and like the day scale keeps the full five-level hierarchy visible (it is a detail view, not a folded one).
+- **\[ENHANCEMENT\]** Beyond zoom-driven LOD, the user may **explicitly fold the whole tree to a uniform hierarchy depth** with the number keys **1–5** (independent of zoom): `1` shows only top-level tasks, each higher number reveals one more tier, `5` expands everything. This folds by collapsing every parent at or below the chosen level, complementing (not replacing) per-row expand/collapse and the global expand-all / collapse-all controls.
 
 ### Temporal Resolution
 
@@ -459,13 +461,13 @@ Future versions may support project cloning, branching schedules, and alternativ
 
 **FR-14.** The system shall handle concurrent edit conflicts at the database layer and warn the user when a save is rejected.
 
-**FR-15.** The Gantt chart shall adapt displayed level of detail to the current zoom level, folding subtasks when zoomed out.
+**FR-15.** The Gantt chart shall adapt displayed level of detail to the current zoom level, folding subtasks when zoomed out, and shall additionally let the user fold the tree to a uniform hierarchy depth (levels 1–5) on demand via the number-key hotkeys, independent of zoom. The zoom scales are day, week, month, quarter, and year.
 
 **FR-16.** A project is owned by its creating user, who may invite other users as editors or viewers; access is scoped to project membership.
 
 **FR-17.** Users shall be able to capture schedule baselines (snapshots) and compare the current schedule against a saved baseline.
 
-**FR-18.** The Gantt timeline shall support a keyboard-driven row selection model (click or arrow-key navigation, visible highlight) with hotkeys for creating, renaming, opening, and deleting tasks.
+**FR-18.** The Gantt timeline shall support a keyboard-driven row selection model (click or arrow-key navigation, visible highlight) with hotkeys for creating, renaming, opening, and deleting tasks, for switching zoom scale (day/week/month/quarter/year), and for folding the tree to a uniform hierarchy depth (1–5).
 
 **FR-19.** Users shall be able to create tasks and subtasks from the timeline by name alone via an inline draft row; all other fields receive smart defaults (context-anchored start date, 1 work-day duration) so every quick task immediately renders a bar. Enter chains the next draft for rapid scaffolding.
 
@@ -523,7 +525,7 @@ The following questions have been resolved for Version 1:
 
 **Concurrency:** Handled at the database layer for V1, with a user-facing warning on rejected saves.
 
-**Temporal resolution:** Day-grain only; zoom levels day / month / quarter / year.
+**Temporal resolution:** Day-grain only; zoom levels day / week / month / quarter / year.
 
 **Zoom behavior:** Slippy-map-style level-of-detail folding of subtasks based on zoom; deterministic Zustand store with row virtualization.
 
@@ -625,7 +627,7 @@ The Gantt chart is the most complex component of the interface - a dense data gr
 ### What the Store Tracks
 
 - Expansion state: which parent nodes the user has toggled open or closed. When a parent is collapsed, all descendant tasks (Levels 2-5 beneath it) are pruned from the active layout engine.
-- Viewport configuration: the current time-scale zoom level (day / month / quarter / year) and horizontal scroll position. A zoom change recomputes the horizontal positioning of every visible time block simultaneously.
+- Viewport configuration: the current time-scale zoom level (day / week / month / quarter / year) and horizontal scroll position. A zoom change recomputes the horizontal positioning of every visible time block simultaneously.
 - Active workspace context.
 
 ### Design Principles
@@ -746,7 +748,7 @@ A new `selectedTaskId` lives in the Gantt store (`useGanttStore`).
 
 ### Hotkey map
 
-Added to the existing keydown handling in `GanttChart.tsx`, with the existing guards (ignore when an input/textarea/select/contenteditable is focused; ignore modified keys except where listed). Mutating keys are no-ops for viewers. No conflicts with existing D/M/Q/Y zoom and T (today).
+Added to the existing keydown handling in `GanttChart.tsx`, with the existing guards (ignore when an input/textarea/select/contenteditable is focused; ignore modified keys except where listed). Mutating keys are no-ops for viewers. No conflicts with existing D/W/M/Q/Y zoom, T (today), and 1–5 fold keys.
 
 | Key | Action |
 |---|---|
@@ -758,6 +760,9 @@ Added to the existing keydown handling in `GanttChart.tsx`, with the existing gu
 | **Enter** | Open the selected task's detail page |
 | **Delete / Backspace** | Delete the selected task (confirm dialog; warns subtree is deleted) |
 | **Esc** | Cancel draft / rename / link mode first; otherwise clear selection |
+| **D / W / M / Q / Y** | Switch zoom scale: day / week / month / quarter / year |
+| **1 – 5** | Fold the tree to a uniform hierarchy depth (1 = top level only … 5 = fully expanded) |
+| **T** | Scroll to today |
 
 Hotkeys are discoverable via the existing `keyboard-shortcut` component: hints shown on context-menu items and in the timeline's shortcut legend alongside the zoom keys.
 
@@ -1121,7 +1126,7 @@ This section records what Phase 7 added on top of the Phase 1–6 + Activity-Log
 ## Product decisions (Phase 7)
 - **Gantt is the timeline surface:** a dedicated `projects.timeline` page (sidebar "Timeline" item), separate from the `Tasks/Index` tree. Both consume identical nested `TaskResource` arrays via `Project::taskTree()`.
 - **Deterministic, externally-managed viewport (A11):** all layout (visible-row list + integer-pixel coordinates) is computed in a Zustand store outside the React render loop; components are purely presentational and read the precomputed `layout`.
-- **Zoom-adaptive level of detail (FR-15):** day / month / quarter / year. Zooming out folds deeper hierarchy tiers (`ZOOM_CONFIG[zoom].maxDepth` = 5/4/3/2) and switches the axis calendar units.
+- **Zoom-adaptive level of detail (FR-15):** day / week / month / quarter / year. Zooming out folds deeper hierarchy tiers (`ZOOM_CONFIG[zoom].maxDepth` = 5/5/4/3/2) and switches the axis calendar units. The week scale (16 px/day, `month → week-start-date → weekday` axis) is a medium-range detail view that keeps all five tiers. Number keys **1–5** additionally fold the tree to a uniform depth on demand (`foldToLevel`), independent of zoom.
 - **Drag-to-reschedule:** dragging a bar body moves `start_date`; dragging the right edge changes `duration_days`; both snap to whole days. Dragging a task **auto-unlocks** it (`is_date_locked = false`) — the user is taking explicit manual control (resolves the default-locked-on-create tension). Editors+ only.
 - **Workday-aware scheduling (FR-5) — now implemented:** tasks carry a `duration_unit` (`work_days` default / `calendar_days`); `Task::endDate()` derives the inclusive end via a project `WorkCalendar` (weekends excluded by default). This realises the workday-aware §5/FR-5 requirement that Phase 6 had stubbed as calendar-day-only. Custom holidays / per-project calendar settings remain a future enhancement (the calendar is currently the Sat/Sun default).
 - **Sibling reordering:** tasks can be reordered among their siblings (same `parent_id`, project-scoped) by **drag** (a row grip handle with a drop indicator) **or** up/down **buttons**, backed by `spatie/eloquent-sortable`. Reparenting / move-to-different-parent is **not** in scope (still deferred).
@@ -1135,10 +1140,10 @@ This section records what Phase 7 added on top of the Phase 1–6 + Activity-Log
 - **`ActivityAction`** gained `Reordered`. Arch allowlist unchanged (the new controllers use only already-permitted layers).
 
 ## Frontend (Phase 7)
-- **State engine (`stores/useGanttStore.ts`, Zustand):** holds `tasks`, `zoom`, `collapsed`, `viewportWidth`, an **extendable** `rangeStart`/`rangeEnd`, and `anchorToken`/`anchorScroll`; recomputes `layout` eagerly in each action. Actions: `init`, `setTasks`, `setZoom`, `setViewportWidth`, `extendRangeStart`/`extendRangeEnd` (infinite scroll), `goToWeek` (Today/jump), `reorderSiblings` (optimistic), `toggleCollapse`/`expandAll`/`collapseAll`.
-- **Pure modules:** `utils/gantt.ts` (integer-pixel geometry constants + date↔pixel helpers incl. `addDays`/`startOfWeek`/`endOfWeek`), `utils/ganttLayout.ts` (`computeLayout` → flat rows with `siblingIds`, `computeRange`, `reorderTree`, `collectParentIds`), `utils/ganttAxis.ts` (three-tier `buildAxis`: primary/secondary/tertiary bands with day/weekday/month/quarter/**fiscal-year** units, weekend flags), and `utils/date.ts`.
+- **State engine (`stores/useGanttStore.ts`, Zustand):** holds `tasks`, `zoom`, `collapsed`, `viewportWidth`, an **extendable** `rangeStart`/`rangeEnd`, and `anchorToken`/`anchorScroll`; recomputes `layout` eagerly in each action. Actions: `init`, `setTasks`, `setZoom`, `setViewportWidth`, `extendRangeStart`/`extendRangeEnd` (infinite scroll), `goToWeek` (Today/jump), `reorderSiblings` (optimistic), `toggleCollapse`/`expandAll`/`collapseAll`/`foldToLevel` (uniform-depth fold for the 1–5 hotkeys).
+- **Pure modules:** `utils/gantt.ts` (integer-pixel geometry constants + date↔pixel helpers incl. `addDays`/`startOfWeek`/`endOfWeek`), `utils/ganttLayout.ts` (`computeLayout` → flat rows with `siblingIds`, `computeRange`, `reorderTree`, `collectParentIds` — takes an optional `minLevel` so the same walk powers both collapse-all and the uniform `foldToLevel` depth fold), `utils/ganttAxis.ts` (three-tier `buildAxis`: primary/secondary/tertiary bands with day/weekday/**week**/month/quarter/**fiscal-year** units, weekend flags), and `utils/date.ts`.
 - **Components (`Pages/Timeline/`):** `Show.tsx` (full-bleed page + store sync + empty state with a "New task" CTA), `GanttChart.tsx` (single scroll container; sticky three-tier axis header; sticky-left virtualized tree pane via `@tanstack/react-virtual`; toolbar with prev/Today/next, expand/collapse-all, zoom control), and partials `TimelineAxis`, `TaskBar`, `TaskBarTooltip`, `DependencyLayer` (FtS connector SVG), `WeekendBands`, `TodayLine` (dotted red current-day marker), `ZoomControl`, plus `barAppearance.ts`. Custom-pointer hooks: `useGanttDrag` (reschedule), `useGanttReorder` (sibling drag), and header click-drag panning — no DnD/gesture dependency.
-- **Interactions:** infinite horizontal scroll (range grows near either edge, left-extension compensated so there is no jump); header drag-to-pan; prev/next/Today buttons; keyboard hotkeys (`d/m/q/y` zoom, `t` Today). Bars show status fill, percent-complete, risk stripe, organization tag, and a manual-lock icon. Reorder shows a grip handle + drop indicator and up/down buttons (editors only).
+- **Interactions:** infinite horizontal scroll (range grows near either edge, left-extension compensated so there is no jump); header drag-to-pan; prev/next/Today buttons; keyboard hotkeys (`d/w/m/q/y` zoom, `1`–`5` uniform-depth fold, `t` Today). Bars show status fill, percent-complete, risk stripe, organization tag, and a manual-lock icon. Reorder shows a grip handle + drop indicator and up/down buttons (editors only).
 - **New dependencies:** `zustand`, `@tanstack/react-virtual` (frontend); `spatie/eloquent-sortable` (backend).
 - **Layout primitive:** `layouts/app-layout` gained a `fullBleed` mode so the Gantt fills the viewport (no centered max-width column).
 

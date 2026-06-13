@@ -7,6 +7,7 @@ import {
     useLayoutEffect,
     useRef,
     useState,
+    type ButtonHTMLAttributes,
     type ReactNode,
     type RefObject,
 } from 'react';
@@ -90,11 +91,12 @@ export function DropdownMenuTrigger({
     children,
     className,
     'aria-label': ariaLabel,
+    ...props
 }: {
     children: ReactNode;
     className?: string;
     'aria-label'?: string;
-}) {
+} & ButtonHTMLAttributes<HTMLButtonElement>) {
     const { open, setOpen, triggerRef } = useDropdown();
 
     return (
@@ -106,6 +108,7 @@ export function DropdownMenuTrigger({
             aria-label={ariaLabel}
             onClick={() => setOpen(!open)}
             className={cn('inline-flex items-center rounded-md', focusRingNeutral, className)}
+            {...props}
         >
             {children}
         </button>
@@ -178,7 +181,13 @@ export function DropdownMenuContent({
             data-dropdown-portal={portaled ? '' : undefined}
             style={
                 portaled
-                    ? { position: 'fixed', top: coords.top, left: coords.left, zIndex: 200 }
+                    ? {
+                          position: 'fixed',
+                          top: coords.top,
+                          left: coords.left,
+                          zIndex: 200,
+                          transform: align === 'end' ? 'translateX(-100%)' : undefined,
+                      }
                     : undefined
             }
             className={panelClassName}
@@ -199,12 +208,13 @@ export function DropdownMenuItem({
     onSelect,
     disabled = false,
     className,
+    ...props
 }: {
     children: ReactNode;
     onSelect?: () => void;
     disabled?: boolean;
     className?: string;
-}) {
+} & ButtonHTMLAttributes<HTMLButtonElement>) {
     const { setOpen } = useDropdown();
 
     return (
@@ -220,6 +230,7 @@ export function DropdownMenuItem({
                 'flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-neutral-200 dark:hover:bg-neutral-800',
                 className,
             )}
+            {...props}
         >
             {children}
         </button>

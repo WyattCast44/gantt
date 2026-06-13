@@ -9,10 +9,10 @@
  * can mutate bar positions through the same math without retrofitting.
  */
 
-/** Time-scale zoom levels (PRD: day / month / quarter / year). */
-export type ZoomLevel = 'day' | 'month' | 'quarter' | 'year';
+/** Time-scale zoom levels (PRD: day / week / month / quarter / year). */
+export type ZoomLevel = 'day' | 'week' | 'month' | 'quarter' | 'year';
 
-export const ZOOM_LEVELS: readonly ZoomLevel[] = ['day', 'month', 'quarter', 'year'] as const;
+export const ZOOM_LEVELS: readonly ZoomLevel[] = ['day', 'week', 'month', 'quarter', 'year'] as const;
 
 type ZoomConfig = {
     /** Integer pixels per calendar day at this zoom. */
@@ -28,6 +28,7 @@ type ZoomConfig = {
 
 export const ZOOM_CONFIG: Record<ZoomLevel, ZoomConfig> = {
     day: { dayWidth: 40, maxDepth: 5, label: 'Day' },
+    week: { dayWidth: 16, maxDepth: 5, label: 'Week' },
     month: { dayWidth: 8, maxDepth: 4, label: 'Month' },
     quarter: { dayWidth: 3, maxDepth: 3, label: 'Quarter' },
     year: { dayWidth: 1, maxDepth: 2, label: 'Year' },
@@ -50,6 +51,9 @@ export const INDENT_STEP = 16;
 
 /** Floor on bar width so a single short task stays clickable when zoomed out. */
 export const MIN_BAR_WIDTH = 4;
+
+/** Maximum task nesting depth (mirrors Task::MAX_DEPTH server-side). */
+export const MAX_TASK_DEPTH = 5;
 
 const MS_PER_DAY = 86_400_000;
 

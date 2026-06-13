@@ -31,7 +31,7 @@ export default function AppLayout({ title, project, fullBleed = false, children 
                 <ResizableSidebar>
                     <div className="flex min-h-0 flex-1 flex-col">
                         <ProjectSwitcher currentProjectId={project?.id} />
-                        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+                        <div className="scrollbar-gutter-stable min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
                             <SidebarNav project={project} />
                         </div>
                     </div>
@@ -40,7 +40,7 @@ export default function AppLayout({ title, project, fullBleed = false, children 
                 {fullBleed ? (
                     <main className="flex min-w-0 flex-1 flex-col overflow-hidden">{children}</main>
                 ) : (
-                    <main className="min-w-0 flex-1 overflow-auto">
+                    <main className="scrollbar-gutter-stable min-w-0 flex-1 overflow-auto">
                         <div className="mx-auto max-w-6xl px-6 py-8">{children}</div>
                     </main>
                 )}

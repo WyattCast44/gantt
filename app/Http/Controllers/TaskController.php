@@ -185,7 +185,7 @@ class TaskController
     /**
      * Delete a task and its subtree.
      */
-    public function destroy(Project $project, Task $task): RedirectResponse
+    public function destroy(Request $request, Project $project, Task $task): RedirectResponse
     {
         $this->authorize('update', $project);
 
@@ -196,8 +196,13 @@ class TaskController
         // never move anything else.
         $project->commitSchedule($project->previewSchedule(), $task);
 
-        // Redirect to the index rather than back() so deleting from the show
-        // page (whose URL now 404s) lands somewhere valid.
+        // Deleting from the timeline reloads in place; otherwise redirect to
+        // the index rather than back() so deleting from the show page (whose
+        // URL now 404s) lands somewhere valid.
+        if ($request->input('from') === 'timeline') {
+            return redirect()->back()->with('status', 'Task deleted.');
+        }
+
         return redirect()
             ->route('projects.tasks.index', $project)
             ->with('status', 'Task deleted.');

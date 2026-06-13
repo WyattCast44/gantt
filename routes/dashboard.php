@@ -14,6 +14,8 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ProjectInvitationController;
 use App\Http\Controllers\ProjectMemberController;
 use App\Http\Controllers\ProjectSettingsController;
+use App\Http\Controllers\QuickStoreTaskController;
+use App\Http\Controllers\RenameTaskController;
 use App\Http\Controllers\ReorderTasksController;
 use App\Http\Controllers\RescheduleTaskController;
 use App\Http\Controllers\RestoreProjectController;
@@ -160,6 +162,11 @@ Route::patch('/projects/{project}/tasks/reorder', ReorderTasksController::class)
     ->middleware('project.member')
     ->name('projects.tasks.reorder');
 
+// Declared before the /tasks/{task} routes so "quick" is not captured as {task}.
+Route::post('/projects/{project}/tasks/quick', QuickStoreTaskController::class)
+    ->middleware('project.member')
+    ->name('projects.tasks.quick-store');
+
 Route::get('/projects/{project}/tasks/{task}', [TaskController::class, 'show'])
     ->middleware('project.member')
     ->scopeBindings()
@@ -174,6 +181,11 @@ Route::patch('/projects/{project}/tasks/{task}/reschedule', RescheduleTaskContro
     ->middleware('project.member')
     ->scopeBindings()
     ->name('projects.tasks.reschedule');
+
+Route::patch('/projects/{project}/tasks/{task}/rename', RenameTaskController::class)
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.tasks.rename');
 
 Route::post('/projects/{project}/tasks/{task}/complete', CompleteTaskController::class)
     ->middleware('project.member')

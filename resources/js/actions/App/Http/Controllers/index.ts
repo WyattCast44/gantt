@@ -10,7 +10,9 @@ import CommentController from './CommentController'
 import TimelineController from './TimelineController'
 import TaskController from './TaskController'
 import ReorderTasksController from './ReorderTasksController'
+import QuickStoreTaskController from './QuickStoreTaskController'
 import RescheduleTaskController from './RescheduleTaskController'
+import RenameTaskController from './RenameTaskController'
 import CompleteTaskController from './CompleteTaskController'
 import TaskCommentController from './TaskCommentController'
 import TaskDependencyController from './TaskDependencyController'
@@ -35,7 +37,9 @@ const Controllers = {
     TimelineController: Object.assign(TimelineController, TimelineController),
     TaskController: Object.assign(TaskController, TaskController),
     ReorderTasksController: Object.assign(ReorderTasksController, ReorderTasksController),
+    QuickStoreTaskController: Object.assign(QuickStoreTaskController, QuickStoreTaskController),
     RescheduleTaskController: Object.assign(RescheduleTaskController, RescheduleTaskController),
+    RenameTaskController: Object.assign(RenameTaskController, RenameTaskController),
     CompleteTaskController: Object.assign(CompleteTaskController, CompleteTaskController),
     TaskCommentController: Object.assign(TaskCommentController, TaskCommentController),
     TaskDependencyController: Object.assign(TaskDependencyController, TaskDependencyController),

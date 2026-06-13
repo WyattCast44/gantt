@@ -23,7 +23,7 @@ export type GanttAxis = {
     readonly tertiary: AxisSegment[];
 };
 
-type CalendarUnit = 'day' | 'month' | 'quarter' | 'year' | 'weekday' | 'fiscal_year';
+type CalendarUnit = 'day' | 'week' | 'month' | 'quarter' | 'year' | 'weekday' | 'fiscal_year';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 
@@ -33,6 +33,7 @@ const WEEKDAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
 /** The {tertiary, secondary, primary} calendar units rendered at each zoom. */
 const AXIS_UNITS: Record<ZoomLevel, { tertiary: CalendarUnit; secondary: CalendarUnit; primary: CalendarUnit }> = {
     day: { tertiary: 'day', secondary: 'weekday', primary: 'month' },
+    week: { tertiary: 'weekday', secondary: 'week', primary: 'month' },
     month: { tertiary: 'month', secondary: 'year', primary: 'fiscal_year' },
     quarter: { tertiary: 'month', secondary: 'quarter', primary: 'fiscal_year' },
     year: { tertiary: 'quarter', secondary: 'year', primary: 'fiscal_year' },
@@ -40,6 +41,11 @@ const AXIS_UNITS: Record<ZoomLevel, { tertiary: CalendarUnit; secondary: Calenda
 
 function quarterOf(date: Date): number {
     return Math.floor(date.getUTCMonth() / 3) + 1;
+}
+
+/** Monday (UTC midnight) of the week containing `date`. */
+function mondayOf(date: Date): Date {
+    return new Date(date.getTime() - ((date.getUTCDay() + 6) % 7) * 86_400_000);
 }
 
 /** US federal FY: Oct 1 – Sep 30, labeled by the calendar year in which it ends. */
@@ -65,6 +71,8 @@ function unitKey(date: Date, unit: CalendarUnit): string {
         case 'day':
         case 'weekday':
             return date.toISOString().slice(0, 10);
+        case 'week':
+            return mondayOf(date).toISOString().slice(0, 10);
         case 'month':
             return `${y}-${date.getUTCMonth()}`;
         case 'quarter':
@@ -84,6 +92,11 @@ function unitLabel(date: Date, unit: CalendarUnit, role: 'primary' | 'secondary'
             return String(date.getUTCDate());
         case 'weekday':
             return weekdayLetter(date);
+        case 'week': {
+            const monday = mondayOf(date);
+
+            return `${MONTHS[monday.getUTCMonth()]} ${monday.getUTCDate()}`;
+        }
         case 'month':
             return role === 'primary' ? `${MONTHS[date.getUTCMonth()]} ${y}` : MONTHS[date.getUTCMonth()];
         case 'quarter':
