@@ -16,7 +16,7 @@ import AppLayout from '@/layouts/app-layout';
 import { destroy as taskCommentDestroy, store as taskCommentStore, update as taskCommentUpdate } from '@/routes/projects/tasks/comments';
 import { destroy as dependencyDestroy, store as dependencyStore } from '@/routes/projects/tasks/dependencies';
 import { destroy as taskDocumentDestroy, store as taskDocumentStore, upload as taskDocumentUpload } from '@/routes/projects/tasks/documents';
-import { destroy as taskDestroy, complete as taskComplete, create as tasksCreate, index as tasksIndex, show as taskShow } from '@/routes/projects/tasks';
+import { destroy as taskDestroy, complete as taskComplete, create as tasksCreate, index as tasksIndex, show as taskShow, timeline as taskTimeline } from '@/routes/projects/tasks';
 import { type BaseClassificationValue, type Dependency, type Document, type Project, type Task } from '@/types';
 import { allowedClassifications } from '@/utils/classification';
 import { formatDateTime } from '@/utils/date';
@@ -567,21 +567,27 @@ export default function Show({
                         <h1 className="mt-1 truncate text-lg font-semibold tracking-tight text-slate-900 dark:text-white">{task.name}</h1>
                     </div>
 
-                    {canEdit && (
-                        <div className="flex shrink-0 flex-wrap items-center gap-2">
-                            {!progressIsDerived && (
-                                <Button variant="secondary" onClick={() => setPercentOpen(true)}>
-                                    Update progress
-                                </Button>
-                            )}
-                            {!isComplete && (
-                                <Button onClick={requestComplete} disabled={completeForm.processing}>
-                                    <CheckCircle2 className="mr-2 h-4 w-4" aria-hidden />
-                                    Mark complete
-                                </Button>
-                            )}
-                        </div>
-                    )}
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        <ButtonLink href={taskTimeline.url([project.id, task.id])} variant="secondary">
+                            <ListTree className="mr-2 h-4 w-4" aria-hidden />
+                            View in timeline
+                        </ButtonLink>
+                        {canEdit && (
+                            <>
+                                {!progressIsDerived && (
+                                    <Button variant="secondary" onClick={() => setPercentOpen(true)}>
+                                        Update progress
+                                    </Button>
+                                )}
+                                {!isComplete && (
+                                    <Button onClick={requestComplete} disabled={completeForm.processing}>
+                                        <CheckCircle2 className="mr-2 h-4 w-4" aria-hidden />
+                                        Mark complete
+                                    </Button>
+                                )}
+                            </>
+                        )}
+                    </div>
                 </div>
 
                 <div className="flex flex-col gap-6 sm:flex-row">

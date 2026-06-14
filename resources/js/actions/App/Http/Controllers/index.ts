@@ -1,3 +1,4 @@
+import SearchController from './SearchController'
 import ProjectController from './ProjectController'
 import RestoreProjectController from './RestoreProjectController'
 import ProjectSettingsController from './ProjectSettingsController'
@@ -11,6 +12,7 @@ import TimelineController from './TimelineController'
 import TaskController from './TaskController'
 import ReorderTasksController from './ReorderTasksController'
 import QuickStoreTaskController from './QuickStoreTaskController'
+import TaskTimelineController from './TaskTimelineController'
 import RescheduleTaskController from './RescheduleTaskController'
 import RenameTaskController from './RenameTaskController'
 import CompleteTaskController from './CompleteTaskController'
@@ -23,8 +25,10 @@ import AcceptInvitationController from './AcceptInvitationController'
 import DeclineInvitationController from './DeclineInvitationController'
 import SidebarCollapsedController from './SidebarCollapsedController'
 import SidebarWidthController from './SidebarWidthController'
+import TimelinePaneWidthController from './TimelinePaneWidthController'
 
 const Controllers = {
+    SearchController: Object.assign(SearchController, SearchController),
     ProjectController: Object.assign(ProjectController, ProjectController),
     RestoreProjectController: Object.assign(RestoreProjectController, RestoreProjectController),
     ProjectSettingsController: Object.assign(ProjectSettingsController, ProjectSettingsController),
@@ -38,6 +42,7 @@ const Controllers = {
     TaskController: Object.assign(TaskController, TaskController),
     ReorderTasksController: Object.assign(ReorderTasksController, ReorderTasksController),
     QuickStoreTaskController: Object.assign(QuickStoreTaskController, QuickStoreTaskController),
+    TaskTimelineController: Object.assign(TaskTimelineController, TaskTimelineController),
     RescheduleTaskController: Object.assign(RescheduleTaskController, RescheduleTaskController),
     RenameTaskController: Object.assign(RenameTaskController, RenameTaskController),
     CompleteTaskController: Object.assign(CompleteTaskController, CompleteTaskController),
@@ -50,6 +55,7 @@ const Controllers = {
     DeclineInvitationController: Object.assign(DeclineInvitationController, DeclineInvitationController),
     SidebarCollapsedController: Object.assign(SidebarCollapsedController, SidebarCollapsedController),
     SidebarWidthController: Object.assign(SidebarWidthController, SidebarWidthController),
+    TimelinePaneWidthController: Object.assign(TimelinePaneWidthController, TimelinePaneWidthController),
 }
 
 export default Controllers

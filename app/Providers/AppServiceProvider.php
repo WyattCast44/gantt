@@ -20,6 +20,9 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Scout\Jobs\MakeSearchableUniquely;
+use Laravel\Scout\Jobs\RemoveFromSearchUniquely;
+use Laravel\Scout\Scout;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -32,7 +35,8 @@ class AppServiceProvider extends ServiceProvider
             ->configureDates()
             ->configureModels()
             ->configurePasswordValidation()
-            ->configureJSONResources();
+            ->configureJSONResources()
+            ->configureScoutEngine();
     }
 
     private function configureModelMorphMap(): static
@@ -106,6 +110,14 @@ class AppServiceProvider extends ServiceProvider
     private function configureJSONResources(): static
     {
         JsonResource::withoutWrapping();
+
+        return $this;
+    }
+
+    private function configureScoutEngine(): static
+    {
+        Scout::makeSearchableUsing(MakeSearchableUniquely::class);
+        Scout::removeFromSearchUsing(RemoveFromSearchUniquely::class);
 
         return $this;
     }

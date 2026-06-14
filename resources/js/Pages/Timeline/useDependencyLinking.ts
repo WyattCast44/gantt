@@ -1,7 +1,7 @@
 import { store as dependencyStore } from '@/routes/projects/tasks/dependencies';
 import { useGanttStore } from '@/stores/useGanttStore';
 import { type Task } from '@/types';
-import { HEADER_HEIGHT, LEFT_PANE_WIDTH } from '@/utils/gantt';
+import { HEADER_HEIGHT } from '@/utils/gantt';
 import { findTask } from '@/utils/ganttLayout';
 import { router } from '@inertiajs/react';
 import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
@@ -167,7 +167,7 @@ export function useDependencyLinking(projectId: number, canEdit: boolean, scroll
             const rect = element.getBoundingClientRect();
 
             return {
-                x: clientX - rect.left + element.scrollLeft - LEFT_PANE_WIDTH,
+                x: clientX - rect.left + element.scrollLeft - useGanttStore.getState().leftPaneWidth,
                 y: clientY - rect.top + element.scrollTop - HEADER_HEIGHT,
             };
         };

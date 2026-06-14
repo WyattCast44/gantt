@@ -72,6 +72,7 @@ class HandleInertiaRequests extends Middleware
                 : [],
             'sidebarWidth' => fn () => (int) $request->session()->get('sidebar_width', 224),
             'sidebarCollapsed' => fn () => (bool) $request->session()->get('sidebar_collapsed', false),
+            'timelinePaneWidth' => fn () => (int) $request->session()->get('timeline_pane_width', 320),
         ];
     }
 

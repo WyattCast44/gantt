@@ -18,15 +18,17 @@ import { useDependencyLinking } from '@/Pages/Timeline/useDependencyLinking';
 import { useGanttDrag } from '@/Pages/Timeline/useGanttDrag';
 import { useGanttReorder } from '@/Pages/Timeline/useGanttReorder';
 import { useQuickCreate } from '@/Pages/Timeline/useQuickCreate';
-import { complete as taskComplete, destroy as taskDestroy, rename as taskRename, show as taskShow } from '@/routes/projects/tasks';
+import { complete as taskComplete, destroy as taskDestroy, rename as taskRename, show as taskShow, timeline as taskTimeline } from '@/routes/projects/tasks';
+import { width as timelinePaneWidthRoute } from '@/routes/timeline-pane';
 import { destroy as dependencyDestroy } from '@/routes/projects/tasks/dependencies';
 import { useGanttStore } from '@/stores/useGanttStore';
-import { type Task } from '@/types';
+import { type SharedProps, type Task } from '@/types';
 import {
     type BarMetrics,
     HEADER_HEIGHT,
     INDENT_STEP,
-    LEFT_PANE_WIDTH,
+    LEFT_PANE_WIDTH_MAX,
+    LEFT_PANE_WIDTH_MIN,
     MAX_TASK_DEPTH,
     MIN_BAR_WIDTH,
     ROW_HEIGHT,
@@ -38,7 +40,7 @@ import { type DragState } from '@/Pages/Timeline/useGanttDrag';
 import { todayInputDate } from '@/utils/date';
 import { cn } from '@/utils/cn';
 import { focusRingNeutral } from '@/utils/focusRing';
-import { Link, router } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, GripVertical, Plus } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -84,6 +86,8 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
     const collapseAll = useGanttStore((state) => state.collapseAll);
     const foldToLevel = useGanttStore((state) => state.foldToLevel);
     const setViewportWidth = useGanttStore((state) => state.setViewportWidth);
+    const leftPaneWidth = useGanttStore((state) => state.leftPaneWidth);
+    const setLeftPaneWidth = useGanttStore((state) => state.setLeftPaneWidth);
     const extendRangeStart = useGanttStore((state) => state.extendRangeStart);
     const extendRangeEnd = useGanttStore((state) => state.extendRangeEnd);
     const goToWeek = useGanttStore((state) => state.goToWeek);
@@ -98,6 +102,8 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
     const openDraft = useGanttStore((state) => state.openDraft);
     const closeDraft = useGanttStore((state) => state.closeDraft);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const paneResizeDragging = useRef(false);
+    const sharedPaneWidthRef = useRef(0);
     const pendingScrollLeft = useRef<number | null>(null);
     const extending = useRef(false);
     const panLastX = useRef<number | null>(null);
@@ -114,9 +120,67 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
     >(null);
     const { commit: commitQuick, error: quickError, failedName, clearError } = useQuickCreate(projectId);
 
+    const { timelinePaneWidth: sharedPaneWidth } = usePage<SharedProps>().props;
+    sharedPaneWidthRef.current = sharedPaneWidth;
+
+    useEffect(() => {
+        setLeftPaneWidth(sharedPaneWidth);
+    }, [sharedPaneWidth, setLeftPaneWidth]);
+
+    const handlePaneResizeMouseDown = useCallback(
+        (event: React.MouseEvent) => {
+            event.preventDefault();
+            paneResizeDragging.current = true;
+            document.body.style.userSelect = 'none';
+            document.body.style.cursor = 'col-resize';
+
+            const startX = event.clientX;
+            const startWidth = leftPaneWidth;
+
+            function handleMouseMove(moveEvent: MouseEvent): void {
+                if (!paneResizeDragging.current) {
+                    return;
+                }
+                const delta = moveEvent.clientX - startX;
+                const next = Math.min(LEFT_PANE_WIDTH_MAX, Math.max(LEFT_PANE_WIDTH_MIN, startWidth + delta));
+                setLeftPaneWidth(next);
+                const element = scrollRef.current;
+                if (element !== null) {
+                    setViewportWidth(Math.max(0, element.clientWidth - next));
+                }
+            }
+
+            function handleMouseUp(): void {
+                paneResizeDragging.current = false;
+                document.body.style.userSelect = '';
+                document.body.style.cursor = '';
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+
+                const resolved = Math.min(
+                    LEFT_PANE_WIDTH_MAX,
+                    Math.max(LEFT_PANE_WIDTH_MIN, useGanttStore.getState().leftPaneWidth),
+                );
+                router.put(
+                    timelinePaneWidthRoute.url(),
+                    { width: resolved },
+                    {
+                        preserveScroll: true,
+                        only: ['timelinePaneWidth'],
+                        onError: () => setLeftPaneWidth(sharedPaneWidthRef.current),
+                    },
+                );
+            }
+
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+        },
+        [leftPaneWidth, setLeftPaneWidth, setViewportWidth],
+    );
+
     const rows = layout.rows;
     const quickRows = layout.quickRows;
-    const totalWidth = LEFT_PANE_WIDTH + layout.contentWidth;
+    const totalWidth = leftPaneWidth + layout.contentWidth;
     const dayWidth = ZOOM_CONFIG[zoom].dayWidth;
 
     // The quick-create block occupies a contiguous run of virtual indices;
@@ -194,7 +258,7 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
             if (element !== null) {
                 const oldDayWidth = ZOOM_CONFIG[zoom].dayWidth;
                 const newDayWidth = ZOOM_CONFIG[newZoom].dayWidth;
-                const trackViewport = Math.max(0, element.clientWidth - LEFT_PANE_WIDTH);
+                const trackViewport = Math.max(0, element.clientWidth - leftPaneWidth);
                 const focalDayOffset = (element.scrollLeft + trackViewport / 2) / oldDayWidth;
 
                 pendingScrollLeft.current = focalDayOffset * newDayWidth - trackViewport / 2;
@@ -202,7 +266,7 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
 
             setZoom(newZoom);
         },
-        [setZoom, zoom],
+        [setZoom, zoom, leftPaneWidth],
     );
 
     // Keep the calendar stretched to fill the visible bar-track width.
@@ -213,14 +277,14 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
             return;
         }
 
-        const update = () => setViewportWidth(Math.max(0, element.clientWidth - LEFT_PANE_WIDTH));
+        const update = () => setViewportWidth(Math.max(0, element.clientWidth - useGanttStore.getState().leftPaneWidth));
 
         update();
         const observer = new ResizeObserver(update);
         observer.observe(element);
 
         return () => observer.disconnect();
-    }, [setViewportWidth]);
+    }, [setViewportWidth, leftPaneWidth]);
 
     // Anchor the horizontal scroll to the data start on (re)init.
     useLayoutEffect(() => {
@@ -704,11 +768,19 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
                 {/* Sticky three-tier header: corner + adaptive time axis. */}
                 <div className="sticky top-0 z-20 flex" style={{ width: totalWidth }}>
                     <div
-                        className="sticky left-0 z-10 flex shrink-0 flex-col justify-center gap-1.5 border-r border-b border-border bg-neutral-50 px-3 dark:border-border-dark dark:bg-neutral-900"
-                        style={{ width: LEFT_PANE_WIDTH, height: HEADER_HEIGHT }}
+                        className="relative sticky left-0 z-10 flex shrink-0 flex-col justify-center gap-1.5 border-r border-b border-border bg-neutral-50 px-3 dark:border-border-dark dark:bg-neutral-900"
+                        style={{ width: leftPaneWidth, height: HEADER_HEIGHT }}
                     >
                         <span className="text-xs font-semibold tracking-wide text-slate-400 uppercase dark:text-neutral-500">Task</span>
                         <TimelineSearch />
+                        <div
+                            role="separator"
+                            aria-orientation="vertical"
+                            aria-label="Resize task list"
+                            title="Drag to resize task list"
+                            onMouseDown={handlePaneResizeMouseDown}
+                            className="absolute inset-y-0 right-0 z-10 w-1 cursor-col-resize hover:bg-accent-500/40 active:bg-accent-500/60"
+                        />
                     </div>
                     <div
                         onPointerDown={startPan}
@@ -729,7 +801,7 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
                     }}
                 >
                     {/* Weekend shading sits over the bar track, behind the bars. */}
-                    <div className="absolute top-0" style={{ left: LEFT_PANE_WIDTH }}>
+                    <div className="absolute top-0" style={{ left: leftPaneWidth }}>
                         <WeekendBands rangeStart={layout.rangeStart} rangeEnd={layout.rangeEnd} zoom={zoom} height={layout.contentHeight} />
                     </div>
 
@@ -737,7 +809,7 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
                     {reorderPreview !== null && (
                         <div
                             className="pointer-events-none absolute left-0 z-30 h-0.5 bg-accent-500"
-                            style={{ top: reorderPreview.dropTop, width: LEFT_PANE_WIDTH }}
+                            style={{ top: reorderPreview.dropTop, width: leftPaneWidth }}
                             aria-hidden
                         />
                     )}
@@ -829,7 +901,7 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
                                               : 'bg-white dark:bg-neutral-950',
                                         reorderPreview?.taskId === row.task.id && 'opacity-50',
                                     )}
-                                    style={{ width: LEFT_PANE_WIDTH, height: ROW_HEIGHT, paddingLeft: 8 + row.depth * INDENT_STEP }}
+                                    style={{ width: leftPaneWidth, height: ROW_HEIGHT, paddingLeft: 8 + row.depth * INDENT_STEP }}
                                 >
                                     {canEdit && row.siblingIds.length > 1 ? (
                                         <button
@@ -947,7 +1019,7 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
 
                     <div
                         className="pointer-events-none absolute top-0 z-[5]"
-                        style={{ left: LEFT_PANE_WIDTH, width: layout.contentWidth, height: layout.contentHeight }}
+                        style={{ left: leftPaneWidth, width: layout.contentWidth, height: layout.contentHeight }}
                     >
                         <TodayLine rangeStart={layout.rangeStart} rangeEnd={layout.rangeEnd} zoom={zoom} height={layout.contentHeight} />
                     </div>
@@ -958,7 +1030,7 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
                         covers them when horizontally scrolled. */}
                     <div
                         className="pointer-events-none absolute top-0 z-[6]"
-                        style={{ left: LEFT_PANE_WIDTH, width: layout.contentWidth, height: layout.contentHeight }}
+                        style={{ left: leftPaneWidth, width: layout.contentWidth, height: layout.contentHeight }}
                     >
                         <DependencyLayer
                             rows={rows}
@@ -1062,6 +1134,11 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
                         </>
                     )}
                     <ContextMenuItem onSelect={() => focusTask(menu.task.id)}>Show in timeline</ContextMenuItem>
+                    {menu.task.children.length > 0 && (
+                        <ContextMenuItem onSelect={() => router.visit(taskTimeline.url([projectId, menu.task.id]))}>
+                            Open subtree in timeline
+                        </ContextMenuItem>
+                    )}
                     <ContextMenuItem shortcut="↵" onSelect={() => router.visit(taskShow.url([projectId, menu.task.id]))}>
                         Open details
                     </ContextMenuItem>

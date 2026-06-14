@@ -12,6 +12,7 @@
         "fortify-development",
         "laravel-best-practices",
         "octane-development",
+        "scout-development",
         "wayfinder-development",
         "pest-testing",
         "inertia-react-development",

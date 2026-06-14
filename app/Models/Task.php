@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Laravel\Scout\Searchable;
 use Spatie\EloquentSortable\Sortable;
 use Spatie\EloquentSortable\SortableTrait;
 
@@ -50,12 +51,32 @@ use Spatie\EloquentSortable\SortableTrait;
 class Task extends Model implements Sortable
 {
     /** @use HasFactory<TaskFactory> */
-    use HasClassification, HasFactory, HasUserStamps, LogsModelActivity, SoftDeletes, SortableTrait;
+    use HasClassification, HasFactory, HasUserStamps, LogsModelActivity, Searchable, SoftDeletes, SortableTrait;
 
     /**
      * The maximum hierarchy depth (PRD V1 decision: five tiers).
      */
     public const int MAX_DEPTH = 5;
+
+    /**
+     * The data indexed for global search. `project_id` is included so
+     * accessible-project scoping via `whereIn('project_id', ...)` works under the
+     * collection engine (dev); the `database` engine (prod) searches the text
+     * columns directly. `tags` is a JSON column, LIKE-matched as text.
+     *
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'project_id' => $this->project_id,
+            'name' => $this->name,
+            'description' => $this->description,
+            'organization' => $this->organization,
+            'tags' => $this->tags,
+        ];
+    }
 
     /**
      * Sortable config: order on `sort_order`. Creation order is set explicitly

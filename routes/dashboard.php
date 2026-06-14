@@ -19,13 +19,16 @@ use App\Http\Controllers\RenameTaskController;
 use App\Http\Controllers\ReorderTasksController;
 use App\Http\Controllers\RescheduleTaskController;
 use App\Http\Controllers\RestoreProjectController;
+use App\Http\Controllers\SearchController;
 use App\Http\Controllers\SidebarCollapsedController;
 use App\Http\Controllers\SidebarWidthController;
 use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskDependencyController;
 use App\Http\Controllers\TaskDocumentController;
+use App\Http\Controllers\TaskTimelineController;
 use App\Http\Controllers\TimelineController;
+use App\Http\Controllers\TimelinePaneWidthController;
 use App\Http\Controllers\UploadTaskDocumentController;
 use Illuminate\Support\Facades\Route;
 
@@ -36,6 +39,14 @@ use Illuminate\Support\Facades\Route;
 */
 Route::inertia('/dashboard', 'Dashboard')
     ->name('dashboard');
+
+/*
+|-----------------------------------------------------------------------------
+| Global search (across the user's accessible projects)
+|-----------------------------------------------------------------------------
+*/
+Route::get('/search', SearchController::class)
+    ->name('search');
 
 /*
 |-----------------------------------------------------------------------------
@@ -172,6 +183,11 @@ Route::get('/projects/{project}/tasks/{task}', [TaskController::class, 'show'])
     ->scopeBindings()
     ->name('projects.tasks.show');
 
+Route::get('/projects/{project}/tasks/{task}/timeline', TaskTimelineController::class)
+    ->middleware('project.member')
+    ->scopeBindings()
+    ->name('projects.tasks.timeline');
+
 Route::patch('/projects/{project}/tasks/{task}', [TaskController::class, 'update'])
     ->middleware('project.member')
     ->scopeBindings()
@@ -261,3 +277,6 @@ Route::put('/sidebar/collapsed', SidebarCollapsedController::class)
 
 Route::put('/sidebar/width', SidebarWidthController::class)
     ->name('sidebar.width');
+
+Route::put('/timeline-pane/width', TimelinePaneWidthController::class)
+    ->name('timeline-pane.width');

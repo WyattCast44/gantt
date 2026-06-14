@@ -269,6 +269,33 @@ export interface SchedulePreview {
     conflicts: ScheduleConflictPreview[];
 }
 
+export type SearchResultType = 'project' | 'task' | 'document';
+
+/** A single global-search hit (one row in the results palette). */
+export interface SearchResultItem {
+    type: SearchResultType;
+    id: number;
+    title: string;
+    subtitle: string | null;
+    projectId: number;
+    projectName: string | null;
+    url: string;
+    classification: string;
+}
+
+/** A group of same-type global-search hits. */
+export interface SearchResultGroup {
+    type: 'projects' | 'tasks' | 'documents';
+    label: string;
+    items: SearchResultItem[];
+}
+
+/** The global-search endpoint response. */
+export interface SearchResponse {
+    query: string;
+    groups: SearchResultGroup[];
+}
+
 export interface SharedProps {
     auth: Auth;
     flash: {
@@ -279,5 +306,6 @@ export interface SharedProps {
     recentProjects: ProjectSummary[];
     sidebarWidth: number;
     sidebarCollapsed: boolean;
+    timelinePaneWidth: number;
     [key: string]: unknown;
 }

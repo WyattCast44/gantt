@@ -12,7 +12,7 @@
  */
 
 import { type Task } from '@/types';
-import { addDays, barMetrics, dayOffset, endOfWeek, focusScrollLeft, inclusiveDaySpan, parseDay, startOfWeek, ZOOM_LEVELS, type ZoomLevel, ZOOM_CONFIG, zoomToFitSpan } from '@/utils/gantt';
+import { addDays, barMetrics, dayOffset, endOfWeek, fitToSpan, focusScrollLeft, inclusiveDaySpan, LEFT_PANE_WIDTH_DEFAULT, parseDay, startOfWeek, ZOOM_LEVELS, type ZoomLevel, ZOOM_CONFIG, zoomToFitSpan } from '@/utils/gantt';
 import {
     collectParentIds,
     computeLayout,
@@ -30,6 +30,12 @@ type GanttInit = {
     tasks: Task[];
     projectStart: string | null;
     projectEnd: string | null;
+    /**
+     * Auto-scale the zoom and scroll to frame the whole data span on init,
+     * instead of keeping the current zoom and anchoring to the data start. Used
+     * when opening a scoped subtree so the entire tree lands in view.
+     */
+    fit?: boolean;
 };
 
 type GanttState = {
@@ -40,6 +46,8 @@ type GanttState = {
     projectEnd: string | null;
     /** Visible bar-track width in px; the calendar is stretched to fill it. */
     viewportWidth: number;
+    /** Width of the sticky left task-name pane in px. */
+    leftPaneWidth: number;
     /** Extendable visible date window (YYYY-MM-DD). */
     rangeStart: string;
     rangeEnd: string;
@@ -62,6 +70,7 @@ type GanttState = {
     setTasks: (tasks: Task[]) => void;
     setZoom: (zoom: ZoomLevel) => void;
     setViewportWidth: (viewportWidth: number) => void;
+    setLeftPaneWidth: (leftPaneWidth: number) => void;
     extendRangeStart: (days: number) => void;
     extendRangeEnd: (days: number) => void;
     /** Scroll the viewport to the week containing `iso` (Monday–Sunday). */
@@ -131,6 +140,23 @@ function layoutFor(state: Pick<GanttState, 'tasks' | 'zoom' | 'collapsed' | 'ran
     });
 }
 
+/** The deepest hierarchy level present in the tree (used to keep fit zoom from folding rows). */
+function maxHierarchyLevel(tasks: Task[]): number {
+    let max = 1;
+
+    const visit = (task: Task): void => {
+        if (task.hierarchy_level > max) {
+            max = task.hierarchy_level;
+        }
+
+        task.children.forEach(visit);
+    };
+
+    tasks.forEach(visit);
+
+    return max;
+}
+
 /** The hierarchy level a draft at this position would occupy (1 = root). */
 function draftLevel(tasks: Task[], position: DraftPosition): number {
     const parent = findTask(tasks, position.parentId);
@@ -149,6 +175,7 @@ export const useGanttStore = create<GanttState>((set, get) => ({
     projectStart: null,
     projectEnd: null,
     viewportWidth: 0,
+    leftPaneWidth: LEFT_PANE_WIDTH_DEFAULT,
     rangeStart: '',
     rangeEnd: '',
     anchorToken: 0,
@@ -160,13 +187,18 @@ export const useGanttStore = create<GanttState>((set, get) => ({
     linking: null,
     layout: EMPTY_LAYOUT,
 
-    init: ({ tasks, projectStart, projectEnd }) => {
-        // Fresh view per project: reset expansion, re-pad the range around the
-        // data, and anchor the scroll so the data start sits at the left edge.
-        const { zoom, viewportWidth } = get();
+    init: ({ tasks, projectStart, projectEnd, fit = false }) => {
+        // Fresh view per project: reset expansion and re-pad the range around
+        // the data. Default anchors the scroll so the data start sits at the
+        // left edge, keeping the current zoom. With `fit`, auto-scale the zoom
+        // and scroll instead so the whole data span is framed in the viewport.
+        const { viewportWidth } = get();
         const data = computeRange(tasks, projectStart, projectEnd);
         const collapsed = new Set<number>();
-        const rangeStart = addDays(data.start, -PAD_DAYS);
+
+        const framed = fit ? fitToSpan(data.start, data.end, viewportWidth, maxHierarchyLevel(tasks), PAD_DAYS) : null;
+        const zoom = framed?.zoom ?? get().zoom;
+        const rangeStart = framed?.rangeStart ?? addDays(data.start, -PAD_DAYS);
         const rangeEnd = fillToViewport(rangeStart, addDays(data.end, PAD_DAYS), zoom, viewportWidth);
 
         set({
@@ -174,10 +206,11 @@ export const useGanttStore = create<GanttState>((set, get) => ({
             projectStart,
             projectEnd,
             collapsed,
+            zoom,
             rangeStart,
             rangeEnd,
             anchorToken: get().anchorToken + 1,
-            anchorScroll: PAD_DAYS * ZOOM_CONFIG[zoom].dayWidth,
+            anchorScroll: framed?.anchorScroll ?? PAD_DAYS * ZOOM_CONFIG[zoom].dayWidth,
             selectedTaskId: null,
             quick: null,
             linking: null,
@@ -261,6 +294,10 @@ export const useGanttStore = create<GanttState>((set, get) => ({
         const rangeEnd = fillToViewport(rangeStart, get().rangeEnd, zoom, viewportWidth);
 
         set({ viewportWidth, rangeEnd, layout: layoutFor({ tasks, zoom, collapsed, rangeStart, rangeEnd, quick }) });
+    },
+
+    setLeftPaneWidth: (leftPaneWidth) => {
+        set({ leftPaneWidth });
     },
 
     extendRangeStart: (days) => {

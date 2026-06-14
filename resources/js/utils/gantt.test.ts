@@ -1,4 +1,4 @@
-import { focusScrollLeft, FOCUS_PADDING_RATIO, zoomToFitSpan } from '@/utils/gantt';
+import { fitToSpan, focusScrollLeft, FOCUS_PADDING_RATIO, ZOOM_CONFIG, zoomToFitSpan } from '@/utils/gantt';
 import { describe, expect, it } from 'vitest';
 
 describe('zoomToFitSpan', () => {
@@ -36,5 +36,36 @@ describe('focusScrollLeft', () => {
 
     it('never returns a negative scroll offset', () => {
         expect(focusScrollLeft(10, 50, 800)).toBe(0);
+    });
+});
+
+describe('fitToSpan', () => {
+    const viewport = 1000;
+    const pad = 100;
+
+    it('picks the finest zoom that frames a short span and pads its origin', () => {
+        const { zoom, rangeStart, anchorScroll } = fitToSpan('2026-01-01', '2026-01-05', viewport, 2, pad);
+
+        // Five days fit at day zoom; the origin sits `pad` days before the span.
+        expect(zoom).toBe('day');
+        expect(rangeStart).toBe('2025-09-23');
+
+        // The span bar starts at pad*dayWidth and is framed with focus padding.
+        const barX = pad * ZOOM_CONFIG[zoom].dayWidth;
+        expect(anchorScroll).toBe(focusScrollLeft(barX, 5 * ZOOM_CONFIG[zoom].dayWidth, viewport));
+    });
+
+    it('coarsens the zoom so a long span still fits the viewport', () => {
+        const short = fitToSpan('2026-01-01', '2026-01-05', viewport, 2, pad).zoom;
+        const long = fitToSpan('2026-01-01', '2027-01-01', viewport, 2, pad).zoom;
+
+        expect(ZOOM_CONFIG[long].dayWidth).toBeLessThan(ZOOM_CONFIG[short].dayWidth);
+    });
+
+    it('keeps deep rows visible by respecting minDepth', () => {
+        // A deep subtree may not fold its rows: only zooms with maxDepth >= 5 qualify.
+        const { zoom } = fitToSpan('2026-01-01', '2026-06-01', viewport, 5, pad);
+
+        expect(ZOOM_CONFIG[zoom].maxDepth).toBeGreaterThanOrEqual(5);
     });
 });

@@ -28,12 +28,30 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Laravel\Scout\Searchable;
 
 #[Fillable(['owner_id', 'name', 'description', 'start_date', 'end_date', 'status', 'base_classification', 'special_access_required', 'handling_caveats', 'programs'])]
 class Project extends Model
 {
     /** @use HasFactory<ProjectFactory> */
-    use HasClassification, HasFactory, HasUserStamps, LogsModelActivity, SoftDeletes;
+    use HasClassification, HasFactory, HasUserStamps, LogsModelActivity, Searchable, SoftDeletes;
+
+    /**
+     * The data indexed for global search. Keys map to real columns so the
+     * `database` engine (prod) searches them directly; the `collection` engine
+     * (dev) matches against these values. `id` is included so accessible-project
+     * scoping via `whereIn('id', ...)` works under the collection engine.
+     *
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'description' => $this->description,
+        ];
+    }
 
     /**
      * Get the attributes that should be cast.
@@ -156,6 +174,30 @@ class Project extends Model
         });
 
         return $tasks->whereNull('parent_id')->values();
+    }
+
+    /**
+     * Load a single task as the root of a nested tree: the given task with the
+     * recursive `children` relation set at every tier, scoped to its subtree.
+     * Feeds the scoped Gantt timeline the same nested TaskResource shape as
+     * taskTree(), so the engine consumes identical arrays — only the membership
+     * differs. Unlike taskTree() the root carries a non-null parent_id, so the
+     * root is selected by id rather than the `whereNull('parent_id')` filter.
+     *
+     * @param  array<int, string>  $with
+     * @return Collection<int, Task>
+     */
+    public function taskSubtree(Task $root, array $with = ['creator']): Collection
+    {
+        $ids = [$root->id, ...$root->descendantIds()];
+        $tasks = $this->tasks()->whereIn('id', $ids)->with($with)->ordered()->get();
+        $byParent = $tasks->groupBy('parent_id');
+
+        $tasks->each(function (Task $task) use ($byParent): void {
+            $task->setRelation('children', $byParent->get($task->id, $task->newCollection())->values());
+        });
+
+        return $tasks->where('id', $root->id)->values();
     }
 
     /**

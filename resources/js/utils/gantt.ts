@@ -43,8 +43,17 @@ export const BAR_HEIGHT = 20;
 /** Two-tier time-axis header height (primary + secondary + tertiary ticks). */
 export const HEADER_HEIGHT = 84;
 
-/** Fixed width of the left task-name tree pane. */
-export const LEFT_PANE_WIDTH = 320;
+/** Default width of the left task-name tree pane. */
+export const LEFT_PANE_WIDTH_DEFAULT = 320;
+
+/** Minimum width of the left task-name tree pane. */
+export const LEFT_PANE_WIDTH_MIN = 240;
+
+/** Maximum width of the left task-name tree pane. */
+export const LEFT_PANE_WIDTH_MAX = 560;
+
+/** Fixed width of the left task-name tree pane (legacy alias). */
+export const LEFT_PANE_WIDTH = LEFT_PANE_WIDTH_DEFAULT;
 
 /** Indentation step per hierarchy level in the left tree pane. */
 export const INDENT_STEP = 16;
@@ -174,4 +183,27 @@ export function barMetrics(
     const days = endIso === null ? 1 : inclusiveDaySpan(startIso, endIso);
 
     return { x, width: Math.max(MIN_BAR_WIDTH, days * dayWidth) };
+}
+
+/**
+ * Auto-scale the viewport to frame a whole date span: the finest zoom whose
+ * span fits the bar-track (keeping `minDepth` rows visible), with the padded
+ * range origin and the scrollLeft that frames the span. Generalizes the
+ * per-task autoscale focusTask runs to an arbitrary range — used when opening a
+ * scoped subtree so the entire tree lands in view. `padDays` is the headroom
+ * kept before the span start (matching the store's initial range padding).
+ */
+export function fitToSpan(
+    spanStartIso: string,
+    spanEndIso: string,
+    viewportWidth: number,
+    minDepth: number,
+    padDays: number,
+): { zoom: ZoomLevel; rangeStart: string; anchorScroll: number } {
+    const zoom = zoomToFitSpan(inclusiveDaySpan(spanStartIso, spanEndIso), viewportWidth, minDepth);
+    const rangeStart = addDays(spanStartIso, -padDays);
+    const bar = barMetrics(spanStartIso, spanEndIso, rangeStart, zoom);
+    const anchorScroll = bar !== null ? focusScrollLeft(bar.x, bar.width, viewportWidth) : padDays * ZOOM_CONFIG[zoom].dayWidth;
+
+    return { zoom, rangeStart, anchorScroll };
 }

@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Database\Eloquent\Collection;
+
 arch('controllers only use approved layers')
     ->expect('App\Http\Controllers')
     ->toOnlyUse([
@@ -25,5 +27,9 @@ arch('controllers only use approved layers')
         // Streamed/file-download responses (e.g. document downloads) are typed
         // against Symfony's HTTP foundation; the file I/O itself lives on models.
         'Symfony\Component\HttpFoundation',
+
+        // Scout engine
+        'Laravel\Scout\Scout',
+        Collection::class,
     ])
     ->ignoring('App\Http\Controllers\Concerns');

@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Scout\Searchable;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -31,13 +32,32 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class Document extends Model
 {
     /** @use HasFactory<DocumentFactory> */
-    use HasClassification, HasFactory, HasUserStamps, LogsModelActivity, SoftDeletes;
+    use HasClassification, HasFactory, HasUserStamps, LogsModelActivity, Searchable, SoftDeletes;
 
     /**
      * The filesystem disk documents are stored on. Config-driven (local by
      * default, swappable to s3) so the storage target lives in one place.
      */
     public const string DISK = 'documents';
+
+    /**
+     * The data indexed for global search. `project_id` is included so
+     * accessible-project scoping via `whereIn('project_id', ...)` works under the
+     * collection engine (dev); the `database` engine (prod) searches the text
+     * columns directly.
+     *
+     * @return array<string, mixed>
+     */
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'project_id' => $this->project_id,
+            'name' => $this->name,
+            'description' => $this->description,
+            'original_filename' => $this->original_filename,
+        ];
+    }
 
     /**
      * Get the attributes that should be cast.

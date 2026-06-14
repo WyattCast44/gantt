@@ -1,4 +1,5 @@
-import { type BarMetrics, BAR_HEIGHT, INDENT_STEP, LEFT_PANE_WIDTH, ROW_HEIGHT } from '@/utils/gantt';
+import { type BarMetrics, BAR_HEIGHT, INDENT_STEP, ROW_HEIGHT } from '@/utils/gantt';
+import { useGanttStore } from '@/stores/useGanttStore';
 import { cn } from '@/utils/cn';
 import { useEffect, useRef } from 'react';
 
@@ -31,11 +32,13 @@ type QuickPendingRowProps = {
 
 /** A committed quick-create awaiting the server: greyed, non-interactive. */
 export function QuickPendingRow({ name, depth, bar, contentWidth }: QuickPendingRowProps) {
+    const leftPaneWidth = useGanttStore((state) => state.leftPaneWidth);
+
     return (
         <>
             <div
                 className="sticky left-0 z-10 flex shrink-0 items-center gap-1 border-r border-b border-border bg-white pr-1 opacity-60 dark:border-border-dark dark:bg-neutral-950"
-                style={{ width: LEFT_PANE_WIDTH, height: ROW_HEIGHT, paddingLeft: 8 + depth * INDENT_STEP + 24 }}
+                style={{ width: leftPaneWidth, height: ROW_HEIGHT, paddingLeft: 8 + depth * INDENT_STEP + 24 }}
             >
                 <span className="min-w-0 flex-1 truncate text-sm text-slate-500 italic dark:text-neutral-400">{name}</span>
             </div>
@@ -67,6 +70,7 @@ type QuickInputRowProps = {
  * chains; Esc cancels; blur commits a non-blank name; Tab/Shift+Tab indent.
  */
 export function QuickInputRow({ depth, bar, contentWidth, value, error, onChange, onCommit, onCancel, onIndent }: QuickInputRowProps) {
+    const leftPaneWidth = useGanttStore((state) => state.leftPaneWidth);
     const inputRef = useRef<HTMLInputElement>(null);
     // Set while Enter/Esc already resolved the row, so the resulting blur
     // doesn't double-commit or cancel a chained draft.
@@ -131,7 +135,7 @@ export function QuickInputRow({ depth, bar, contentWidth, value, error, onChange
         <>
             <div
                 className="sticky left-0 z-10 flex shrink-0 items-center gap-1 border-r border-b border-accent-300 bg-accent-50/60 pr-1 dark:border-accent-700 dark:bg-accent-500/10"
-                style={{ width: LEFT_PANE_WIDTH, height: ROW_HEIGHT, paddingLeft: 8 + depth * INDENT_STEP + 24 }}
+                style={{ width: leftPaneWidth, height: ROW_HEIGHT, paddingLeft: 8 + depth * INDENT_STEP + 24 }}
             >
                 <input
                     ref={inputRef}
