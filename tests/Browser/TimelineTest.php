@@ -28,7 +28,7 @@ test('the timeline renders the gantt grid without javascript errors', function (
         ->assertSee('Sensor Integration')
         ->assertSee('Test Squadron')
         ->assertSee('Expand all')
-        ->assertSee('Quarter')
+        ->assertPresent('[aria-label="Quarter view"]')
         ->assertNoJavascriptErrors();
 });
 
@@ -46,7 +46,7 @@ test('the timeline preserves the viewport date when switching zoom levels', func
 
     $before = $page->script("(() => { const el = document.querySelector('[data-testid=gantt-scroll]'); const track = el.clientWidth - 320; return Math.round((el.scrollLeft + track / 2) / 8); })()");
 
-    $page->click('Day');
+    $page->click('[aria-label="Day view"]');
     $page->wait(0.3);
 
     $after = $page->script("(() => { const el = document.querySelector('[data-testid=gantt-scroll]'); const track = el.clientWidth - 320; return Math.round((el.scrollLeft + track / 2) / 40); })()");
@@ -65,10 +65,10 @@ test('the timeline can switch zoom and collapse the tree without javascript erro
     $page = visit("/projects/{$project->id}/timeline");
 
     // Switch the time scale (Year folds detail; Day renders weekend shading).
-    $page->click('Year')
+    $page->click('[aria-label="Year view"]')
         ->assertNoJavascriptErrors();
 
-    $page->click('Day')
+    $page->click('[aria-label="Day view"]')
         ->assertNoJavascriptErrors();
 
     // Collapsing should hide the child row.
@@ -123,7 +123,7 @@ test('the timeline day view shows weekday letters in the axis', function () {
     actingAs($owner);
 
     visit("/projects/{$project->id}/timeline")
-        ->click('Day')
+        ->click('[aria-label="Day view"]')
         ->assertPresent('[data-testid=axis-tertiary] [data-axis-segment]')
         ->assertSee('M')
         ->assertNoJavascriptErrors();
@@ -136,7 +136,7 @@ test('the timeline quarter view labels quarters with their calendar year', funct
     actingAs($owner);
 
     visit("/projects/{$project->id}/timeline")
-        ->click('Quarter')
+        ->click('[aria-label="Quarter view"]')
         ->assertSee('Q1 / 2026')
         ->assertNoJavascriptErrors();
 });
@@ -148,7 +148,7 @@ test('the timeline month view shows fiscal year context in the axis', function (
     actingAs($owner);
 
     visit("/projects/{$project->id}/timeline")
-        ->click('Month')
+        ->click('[aria-label="Month view"]')
         ->assertPresent('[data-testid=axis-fiscal-year] [data-axis-segment]')
         ->assertSee('FY')
         ->assertNoJavascriptErrors();
@@ -177,11 +177,11 @@ test('the timeline zoom hotkeys switch the time scale', function () {
 
     $page->script("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'y', bubbles: true }))");
     $page->wait(0.2);
-    $page->assertScript("document.querySelector('[aria-label=\"Zoom level\"] [aria-pressed=\"true\"]')?.textContent?.trim() === 'Year'");
+    $page->assertScript("document.querySelector('[aria-label=\"Zoom level\"] [aria-pressed=\"true\"]')?.textContent?.trim() === 'Y'");
 
     $page->script("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', bubbles: true }))");
     $page->wait(0.2);
-    $page->assertScript("document.querySelector('[aria-label=\"Zoom level\"] [aria-pressed=\"true\"]')?.textContent?.trim() === 'Day'");
+    $page->assertScript("document.querySelector('[aria-label=\"Zoom level\"] [aria-pressed=\"true\"]')?.textContent?.trim() === 'D'");
 
     $page->assertNoJavascriptErrors();
 });

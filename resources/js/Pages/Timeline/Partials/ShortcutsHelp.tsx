@@ -55,6 +55,7 @@ export default function ShortcutsHelp({ canEdit }: { canEdit: boolean }) {
                     </>
                 )}
                 <DropdownMenuLabel>Navigate</DropdownMenuLabel>
+                <ShortcutRow keys={['/']}>Find a task</ShortcutRow>
                 <ShortcutRow keys={['↑', '↓']}>Select the previous / next task</ShortcutRow>
                 <ShortcutRow keys={['←', '→']}>Collapse / expand the selection</ShortcutRow>
                 <ShortcutRow keys={['↵']}>Open the selected task</ShortcutRow>

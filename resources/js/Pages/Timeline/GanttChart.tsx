@@ -9,6 +9,7 @@ import TaskBar from '@/Pages/Timeline/Partials/TaskBar';
 import TodayLine from '@/Pages/Timeline/Partials/TodayLine';
 import WeekendBands from '@/Pages/Timeline/Partials/WeekendBands';
 import ShortcutsHelp from '@/Pages/Timeline/Partials/ShortcutsHelp';
+import TimelineSearch from '@/Pages/Timeline/Partials/TimelineSearch';
 import { ToolbarButtonGroup, ToolbarGroupButton, ToolbarTooltip, toolbarSegmentClass } from '@/Pages/Timeline/Partials/ToolbarButtonGroup';
 import { Tooltip } from '@/components/ui/tooltip';
 import TimelineAxis from '@/Pages/Timeline/Partials/TimelineAxis';
@@ -703,10 +704,11 @@ export default function GanttChart({ projectId, canEdit }: { projectId: number; 
                 {/* Sticky three-tier header: corner + adaptive time axis. */}
                 <div className="sticky top-0 z-20 flex" style={{ width: totalWidth }}>
                     <div
-                        className="sticky left-0 z-10 flex shrink-0 items-center border-r border-b border-border bg-neutral-50 px-3 dark:border-border-dark dark:bg-neutral-900"
+                        className="sticky left-0 z-10 flex shrink-0 flex-col justify-center gap-1.5 border-r border-b border-border bg-neutral-50 px-3 dark:border-border-dark dark:bg-neutral-900"
                         style={{ width: LEFT_PANE_WIDTH, height: HEADER_HEIGHT }}
                     >
                         <span className="text-xs font-semibold tracking-wide text-slate-400 uppercase dark:text-neutral-500">Task</span>
+                        <TimelineSearch />
                     </div>
                     <div
                         onPointerDown={startPan}

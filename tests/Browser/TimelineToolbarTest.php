@@ -63,6 +63,72 @@ test('a viewer sees navigation shortcuts but no create buttons', function () {
     $page->assertNoJavascriptErrors();
 });
 
+test('the search input filters tasks and selecting a hit reveals it', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    $parent = Task::factory()->forProject($project)->create(['name' => 'Airframe', 'start_date' => '2026-01-05']);
+    Task::factory()->forProject($project)->child($parent)->create(['name' => 'Fuselage panel', 'start_date' => '2026-01-06']);
+    Task::factory()->forProject($project)->create(['name' => 'Landing gear', 'start_date' => '2026-01-07']);
+    actingAs($owner);
+
+    $page = visit("/projects/{$project->id}/timeline");
+    $page->assertSee('Airframe');
+
+    // Collapse the tree so the nested match is not initially visible.
+    $page->click('Collapse all');
+    $page->assertDontSee('Fuselage panel');
+
+    $page->type('[data-testid=timeline-search]', 'fuselage');
+    $page->wait(0.4);
+
+    // The dropdown lists the match with its parent breadcrumb.
+    $page->assertSee('Fuselage panel')->assertSee('Airframe');
+
+    $page->keys('[data-testid=timeline-search]', 'Enter');
+    $page->wait(0.4);
+
+    // Selecting expands the ancestor and selects the (now revealed) task row.
+    $fuselageId = $project->tasks()->where('name', 'Fuselage panel')->value('id');
+
+    $page->assertSee('Fuselage panel')
+        ->assertAttribute('[id="gantt-row-'.$fuselageId.'"]', 'aria-selected', 'true')
+        ->assertNoJavascriptErrors();
+});
+
+test('pressing the slash hotkey focuses the search input', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    Task::factory()->forProject($project)->create(['name' => 'Airframe', 'start_date' => '2026-01-05']);
+    actingAs($owner);
+
+    $page = visit("/projects/{$project->id}/timeline");
+    $page->assertSee('Airframe');
+
+    $page->keys('[data-testid=gantt-scroll]', '/');
+    $page->wait(0.2);
+
+    // Typing now lands in the search box, opening the results dropdown.
+    $page->type('[data-testid=timeline-search]', 'airframe');
+    $page->wait(0.4);
+
+    $page->assertVisible('#timeline-search-results')->assertNoJavascriptErrors();
+});
+
+test('the search dropdown reports when nothing matches', function () {
+    $owner = User::factory()->create();
+    $project = Project::factory()->withOwner($owner)->create();
+    Task::factory()->forProject($project)->create(['name' => 'Airframe', 'start_date' => '2026-01-05']);
+    actingAs($owner);
+
+    $page = visit("/projects/{$project->id}/timeline");
+    $page->assertSee('Airframe');
+
+    $page->type('[data-testid=timeline-search]', 'zzznope');
+    $page->wait(0.4);
+
+    $page->assertSee('No matching tasks.')->assertNoJavascriptErrors();
+});
+
 test('an empty project can scaffold its first task from the timeline', function () {
     $owner = User::factory()->create();
     $project = Project::factory()->withOwner($owner)->create();
